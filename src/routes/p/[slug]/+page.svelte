@@ -33,11 +33,15 @@
 <!-- Status bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
 	<div class="flex items-center gap-3">
-		{#if data.anchor}
+		{#if data.anchor && data.anchor.verified}
 			<span
 				class="flex items-center gap-2 rounded-full bg-mercury-050 px-3 py-1.5 text-sm text-mercury-ink"
 			>
-				<ShieldCheck size={16} /> Anchored v{data.anchor.version}
+				<ShieldCheck size={16} /> Anchored v{data.anchor.version}, verified
+			</span>
+		{:else if data.anchor}
+			<span class="flex items-center gap-2 rounded-full bg-neg-050 px-3 py-1.5 text-sm text-neg">
+				<ShieldAlert size={16} /> Anchored v{data.anchor.version}, declaration changed
 			</span>
 		{:else}
 			<span

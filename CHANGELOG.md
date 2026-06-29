@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-29
+
+### Added
+
+- On-chain anchoring flow: an anchor page shows the canonical declaration, its blake2b-256 hash, and the metadata to publish under the Mercury metadata label, then records the anchoring transaction with an automatic version counter.
+- Declaration verification on the public statement: the page recomputes the declaration hash and shows a verified badge when it matches the anchored hash, or flags that the declaration has changed since anchoring.
+- Statement export to an .xlsx workbook.
+- Declaration payload builder and export-row helpers, with unit tests.
+
 ## [0.5.0] - 2026-06-29
 
 ### Added

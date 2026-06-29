@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Trash2, ExternalLink, Wallet, RefreshCw } from 'lucide-svelte';
+	import { Trash2, ExternalLink, Wallet, RefreshCw, Link2 } from 'lucide-svelte';
 	import { formatAmount, formatDateISO, truncateMiddle } from '$lib/format';
 	import { VESTING_TYPES } from '$lib/projects/validation';
 	import type { ActionData, PageData } from './$types';
@@ -19,9 +19,14 @@
 		<p class="eyebrow">Project</p>
 		<h1 class="text-2xl font-bold text-ink-900">{data.project.name}</h1>
 	</div>
-	<a href="/p/{data.project.slug}" class="btn btn-ghost">
-		<ExternalLink size={18} /> View public statement
-	</a>
+	<div class="flex items-center gap-2">
+		<a href="/dashboard/projects/{data.project.id}/anchor" class="btn btn-ghost">
+			<Link2 size={18} /> Anchor
+		</a>
+		<a href="/p/{data.project.slug}" class="btn btn-ghost">
+			<ExternalLink size={18} /> View public statement
+		</a>
+	</div>
 </div>
 
 <!-- Project details -->

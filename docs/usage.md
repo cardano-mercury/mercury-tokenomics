@@ -49,6 +49,8 @@ Declare the wallets the project controls and assign them to buckets where approp
 
 Bring in delivered amounts on the project page. Use Sync from chain to pull external outflows from Koios for the declared wallets, or record movements manually (date, bucket, direction, amount) when you want to enter known distributions. These feed the Delivered side of the statement.
 
+Anchor the declaration from the project's Anchor page. The page shows the declaration hash and the exact metadata to publish under the Mercury metadata label. Submit that metadata in a transaction from a wallet you control, then paste the transaction hash to record the anchor. Each anchor increments the version. Wallet-based building and submission with MeshJS is a later enhancement.
+
 Anchor the declaration on-chain. The tool publishes a compact record to Cardano transaction metadata so the declaration is timestamped and tamper-evident. Re-anchoring after changes creates a new version.
 
 Tag transactions to explain or reclassify specific movements (for example a CEX listing or a liquidity addition). Tags annotate the automatically computed numbers, they do not replace them.
@@ -59,7 +61,7 @@ Browse the directory of participating projects at Projects, and open one to see 
 
 The statement presents Promised versus Delivered. Promised is what the schedule says should be unlocked at a given time; Delivered is what has actually been distributed out of the project's controlled wallets. Move the date scrubber to see how adherence has evolved, read the per-bucket bars and the promised and delivered distribution donuts, and follow the adherence-over-time chart. Overall totals and the delivered share are shown at a glance.
 
-If a project has anchored its declaration, the statement shows the anchor version and hash so you can confirm it against the chain. Anchoring and statement export are later milestones.
+If a project has anchored its declaration, the statement shows the anchor version and a verification badge: the page recomputes the declaration hash and confirms it matches what was anchored, or flags that the declaration has changed since. Use Export as xlsx to download the statement as a spreadsheet.
 
 ## Glossary
 

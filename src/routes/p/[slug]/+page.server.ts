@@ -12,6 +12,8 @@ import { eq, asc, desc } from 'drizzle-orm';
 import { assembleStatement } from '$lib/tokenomics/statement';
 import { buildChartData } from '$lib/charts';
 import { scaleToNumber } from '$lib/charts';
+import { buildDeclarationPayload } from '$lib/server/declaration';
+import { hashDeclaration } from '$lib/tokenomics/anchor';
 
 function hexToTicker(hex: string): string {
 	if (!hex) return 'tokens';
@@ -43,7 +45,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		.orderBy(desc(anchorRecord.version))
 		.limit(1);
 	const wallets = await db
-		.select({ id: controlledWallet.id })
+		.select({ id: controlledWallet.id, address: controlledWallet.address })
 		.from(controlledWallet)
 		.where(eq(controlledWallet.projectId, proj.id));
 
@@ -74,6 +76,17 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	const chart = buildChartData(statement, proj.decimals);
 
+	let verified: boolean | null = null;
+	if (anchor) {
+		const payload = buildDeclarationPayload(
+			{ ...proj, t0: new Date(proj.t0) },
+			buckets,
+			wallets.map((w) => w.address),
+			anchor.version
+		);
+		verified = hashDeclaration(payload).toLowerCase() === anchor.payloadHash.toLowerCase();
+	}
+
 	return {
 		project: {
 			name: proj.name,
@@ -95,7 +108,8 @@ export const load: PageServerLoad = async ({ params }) => {
 					version: anchor.version,
 					hash: anchor.payloadHash,
 					txHash: anchor.txHash,
-					anchoredAt: new Date(anchor.anchoredAt).toISOString()
+					anchoredAt: new Date(anchor.anchoredAt).toISOString(),
+					verified
 				}
 			: null
 	};
