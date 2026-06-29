@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-29
+
+### Added
+
+- Public project directory and per-project tokenomics statement showing Promised versus Delivered: per-bucket bars, promised and delivered distribution donuts, an adherence-over-time line chart, a date scrubber, and overall totals.
+- `token_movement` store plus dashboard tools to sync external outflows from Koios and to record movements manually, feeding the Delivered side of the statement.
+- Koios chain client with pure transaction-netting logic, the statement assembler that maps stored data onto the comparison engine, and chart-data helpers, all with unit tests.
+
+### Changed
+
+- Charts render as lightweight, dependency-free SVG components for the proof of concept. LayerCake remains the intended option if richer interactions are needed later.
+
 ## [0.4.0] - 2026-06-29
 
 ### Added

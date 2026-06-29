@@ -1,14 +1,16 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { project, bucket, controlledWallet } from '$lib/server/db/schema';
-import { and, eq, asc } from 'drizzle-orm';
+import { project, bucket, controlledWallet, tokenMovement } from '$lib/server/db/schema';
+import { and, eq, asc, desc } from 'drizzle-orm';
 import {
 	validateProject,
 	validateBucket,
+	parseBaseUnits,
 	type NetworkName,
 	type VestingTypeName
 } from '$lib/projects/validation';
+import { syncProjectMovements } from '$lib/server/koios';
 
 async function ownedProject(userId: string, id: string) {
 	const [row] = await db
@@ -33,8 +35,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.from(controlledWallet)
 		.where(eq(controlledWallet.projectId, owned.id))
 		.orderBy(asc(controlledWallet.createdAt));
+	const movements = await db
+		.select()
+		.from(tokenMovement)
+		.where(eq(tokenMovement.projectId, owned.id))
+		.orderBy(desc(tokenMovement.occurredAt));
 
-	return { project: owned, buckets, wallets };
+	return { project: owned, buckets, wallets, movements };
 };
 
 export const actions: Actions = {
@@ -162,5 +169,96 @@ export const actions: Actions = {
 			.delete(controlledWallet)
 			.where(and(eq(controlledWallet.id, walletId), eq(controlledWallet.projectId, owned.id)));
 		return { scope: 'wallet', ok: true };
+	},
+
+	syncChain: async (event) => {
+		const user = event.locals.user;
+		if (!user) return redirect(302, '/login');
+		const owned = await ownedProject(user.id, event.params.id);
+		if (!owned) return error(404, 'Project not found');
+
+		const wallets = await db
+			.select()
+			.from(controlledWallet)
+			.where(eq(controlledWallet.projectId, owned.id));
+		if (wallets.length === 0) {
+			return fail(400, { scope: 'chain', message: 'Add at least one controlled wallet first.' });
+		}
+
+		try {
+			const { movements, transactionsScanned } = await syncProjectMovements({
+				network: owned.network,
+				unit: { policyId: owned.policyId, assetNameHex: owned.assetNameHex },
+				addresses: wallets.map((w) => w.address),
+				addressBucket: new Map(wallets.map((w) => [w.address, w.bucketId]))
+			});
+
+			await db
+				.delete(tokenMovement)
+				.where(and(eq(tokenMovement.projectId, owned.id), eq(tokenMovement.source, 'chain')));
+			if (movements.length) {
+				await db.insert(tokenMovement).values(
+					movements.map((m) => ({
+						projectId: owned.id,
+						bucketId: m.bucketId,
+						txHash: m.txHash,
+						direction: m.direction,
+						amount: m.amount.toString(),
+						occurredAt: m.at,
+						counterparty: m.counterparty,
+						source: 'chain' as const
+					}))
+				);
+			}
+			return { scope: 'chain', ok: true, synced: movements.length, scanned: transactionsScanned };
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Unknown error';
+			return fail(502, { scope: 'chain', message: `Could not sync from Koios: ${message}` });
+		}
+	},
+
+	addMovement: async (event) => {
+		const user = event.locals.user;
+		if (!user) return redirect(302, '/login');
+		const owned = await ownedProject(user.id, event.params.id);
+		if (!owned) return error(404, 'Project not found');
+
+		const form = await event.request.formData();
+		const amountRaw = form.get('amount')?.toString() ?? '';
+		const direction = form.get('direction')?.toString() === 'in' ? 'in' : 'out';
+		const occurredAt = form.get('occurredAt')?.toString() ?? '';
+		const bucketId = form.get('bucketId')?.toString() || null;
+
+		if (parseBaseUnits(amountRaw) === null) {
+			return fail(400, { scope: 'movement', message: 'Amount must be whole base units.' });
+		}
+		if (Number.isNaN(Date.parse(occurredAt))) {
+			return fail(400, { scope: 'movement', message: 'Please provide a valid date.' });
+		}
+
+		await db.insert(tokenMovement).values({
+			projectId: owned.id,
+			bucketId,
+			txHash: `manual-${crypto.randomUUID().slice(0, 8)}`,
+			direction,
+			amount: amountRaw.trim(),
+			occurredAt: new Date(occurredAt),
+			source: 'manual'
+		});
+		return { scope: 'movement', ok: true };
+	},
+
+	deleteMovement: async (event) => {
+		const user = event.locals.user;
+		if (!user) return redirect(302, '/login');
+		const owned = await ownedProject(user.id, event.params.id);
+		if (!owned) return error(404, 'Project not found');
+
+		const form = await event.request.formData();
+		const movementId = form.get('movementId')?.toString() ?? '';
+		await db
+			.delete(tokenMovement)
+			.where(and(eq(tokenMovement.id, movementId), eq(tokenMovement.projectId, owned.id)));
+		return { scope: 'movement', ok: true };
 	}
 };

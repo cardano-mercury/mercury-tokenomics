@@ -47,19 +47,19 @@ Define buckets on the project page. Each bucket has a name (for example Founders
 
 Declare the wallets the project controls and assign them to buckets where appropriate. Wallets are currently recorded as unverified; cryptographic ownership proof by signing a challenge with the wallet is a later milestone.
 
+Bring in delivered amounts on the project page. Use Sync from chain to pull external outflows from Koios for the declared wallets, or record movements manually (date, bucket, direction, amount) when you want to enter known distributions. These feed the Delivered side of the statement.
+
 Anchor the declaration on-chain. The tool publishes a compact record to Cardano transaction metadata so the declaration is timestamped and tamper-evident. Re-anchoring after changes creates a new version.
 
 Tag transactions to explain or reclassify specific movements (for example a CEX listing or a liquidity addition). Tags annotate the automatically computed numbers, they do not replace them.
 
-## For reviewers (planned)
+## For reviewers
 
-Browse the directory of participating projects and open a project to see its statement.
+Browse the directory of participating projects at Projects, and open one to see its statement. No account is needed.
 
-The statement presents Promised versus Delivered. Promised is what the schedule says should be unlocked or allocated; Delivered is what has actually been distributed out of the project's controlled wallets. You can move through time with the period control to see how adherence has evolved, and read both the per-bucket breakdown and the project total. A snapshot view shows the current position at a glance.
+The statement presents Promised versus Delivered. Promised is what the schedule says should be unlocked at a given time; Delivered is what has actually been distributed out of the project's controlled wallets. Move the date scrubber to see how adherence has evolved, read the per-bucket bars and the promised and delivered distribution donuts, and follow the adherence-over-time chart. Overall totals and the delivered share are shown at a glance.
 
-Verify the on-chain anchor to confirm that the declaration you are reading matches what the project committed to the blockchain.
-
-Export the statement for your own records.
+If a project has anchored its declaration, the statement shows the anchor version and hash so you can confirm it against the chain. Anchoring and statement export are later milestones.
 
 ## Glossary
 

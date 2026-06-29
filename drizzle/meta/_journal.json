@@ -15,6 +15,13 @@
       "when": 1782771741767,
       "tag": "0001_lying_robbie_robertson",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782772872798,
+      "tag": "0002_complete_gamora",
+      "breakpoints": true
     }
   ]
 }

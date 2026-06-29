@@ -6,7 +6,7 @@ This is the proof of concept for Catalyst Fund 13, Milestone 2. See `docs/prd.md
 
 ## Tech
 
-SvelteKit and TypeScript, Drizzle ORM over SQLite, Better Auth for accounts, MeshJS and Koios for Cardano interaction, and LayerCake for charts. The app targets a self-hosted Node deployment and defaults to the Preprod network.
+SvelteKit and TypeScript, Drizzle ORM over SQLite, Better Auth for accounts, Koios for chain data, MeshJS for on-chain anchoring, and dependency-free SVG charts. The app targets a self-hosted Node deployment and defaults to the Preprod network.
 
 ## Getting started
 

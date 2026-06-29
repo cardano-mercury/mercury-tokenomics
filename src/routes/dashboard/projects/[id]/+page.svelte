@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Trash2, ExternalLink, Wallet } from 'lucide-svelte';
+	import { Trash2, ExternalLink, Wallet, RefreshCw } from 'lucide-svelte';
 	import { formatAmount, formatDateISO, truncateMiddle } from '$lib/format';
 	import { VESTING_TYPES } from '$lib/projects/validation';
 	import type { ActionData, PageData } from './$types';
@@ -251,6 +251,109 @@
 		</div>
 	</form>
 	{#if form?.scope === 'wallet' && form?.message}
+		<p class="mt-3 text-sm text-neg">{form.message}</p>
+	{/if}
+</section>
+
+<!-- Chain data -->
+<section class="card mt-6 p-8">
+	<div class="mb-1 flex items-center justify-between">
+		<h2 class="text-lg font-semibold text-ink-900">Token movements</h2>
+		<form method="post" action="?/syncChain" use:enhance>
+			<button class="btn btn-ghost">
+				<RefreshCw size={16} /> Sync from chain
+			</button>
+		</form>
+	</div>
+	<p class="mb-4 text-sm text-ink-600">
+		Sync pulls external outflows from Koios for the declared wallets. You can also record movements
+		manually. These feed the Delivered side of the statement.
+	</p>
+
+	{#if form?.scope === 'chain' && form?.message}
+		<p class="mb-4 text-sm text-neg">{form.message}</p>
+	{:else if form?.scope === 'chain' && form?.ok}
+		<p class="mb-4 text-sm text-pos">
+			Synced {form.synced} movement{form.synced === 1 ? '' : 's'} from {form.scanned} transactions.
+		</p>
+	{/if}
+
+	{#if data.movements.length}
+		<div class="mb-6 overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="text-left text-ink-400">
+						<th class="py-2 font-normal">Date</th>
+						<th class="py-2 font-normal">Bucket</th>
+						<th class="py-2 font-normal">Direction</th>
+						<th class="py-2 text-right font-normal">Amount</th>
+						<th class="py-2 font-normal">Source</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.movements as m (m.id)}
+						{@const bucketName = data.buckets.find((b) => b.id === m.bucketId)?.name}
+						<tr class="border-t border-ink-100">
+							<td class="data py-2 text-ink-600">{formatDateISO(new Date(m.occurredAt))}</td>
+							<td class="py-2 text-ink-900">{bucketName ?? 'Unassigned'}</td>
+							<td class="py-2 {m.direction === 'out' ? 'text-neg' : 'text-pos'}">
+								{m.direction === 'out' ? 'Outflow' : 'Inbound'}
+							</td>
+							<td class="data py-2 text-right">{formatAmount(BigInt(m.amount), decimals)}</td>
+							<td class="py-2 text-ink-400">{m.source}</td>
+							<td class="py-2 text-right">
+								<form method="post" action="?/deleteMovement" use:enhance>
+									<input type="hidden" name="movementId" value={m.id} />
+									<button class="text-ink-400 hover:text-neg" aria-label="Delete movement">
+										<Trash2 size={16} />
+									</button>
+								</form>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{:else}
+		<p class="mb-6 text-sm text-ink-600">No movements recorded yet.</p>
+	{/if}
+
+	<form
+		method="post"
+		action="?/addMovement"
+		use:enhance
+		class="grid items-end gap-3 sm:grid-cols-5"
+	>
+		<div>
+			<label class="label" for="m-date">Date</label>
+			<input class="input" id="m-date" name="occurredAt" type="date" />
+		</div>
+		<div>
+			<label class="label" for="m-bucket">Bucket</label>
+			<select class="input" id="m-bucket" name="bucketId">
+				<option value="">Unassigned</option>
+				{#each data.buckets as b (b.id)}
+					<option value={b.id}>{b.name}</option>
+				{/each}
+			</select>
+		</div>
+		<div>
+			<label class="label" for="m-dir">Direction</label>
+			<select class="input" id="m-dir" name="direction">
+				<option value="out">Outflow</option>
+				<option value="in">Inbound</option>
+			</select>
+		</div>
+		<div>
+			<label class="label" for="m-amount">Amount (base units)</label>
+			<input class="input data" id="m-amount" name="amount" placeholder="0" />
+		</div>
+		<div class="sm:justify-self-end">
+			<button class="btn btn-affirmative w-full sm:w-auto">Add movement</button>
+		</div>
+	</form>
+	{#if form?.scope === 'movement' && form?.message}
 		<p class="mt-3 text-sm text-neg">{form.message}</p>
 	{/if}
 </section>

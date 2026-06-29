@@ -150,9 +150,41 @@ export const anchorRecord = sqliteTable(
 	]
 );
 
+export const tokenMovement = sqliteTable(
+	'token_movement',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		projectId: text('project_id')
+			.notNull()
+			.references(() => project.id, { onDelete: 'cascade' }),
+		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
+		txHash: text('tx_hash').notNull(),
+		// Net external direction relative to the controlled set.
+		direction: text('direction', { enum: ['out', 'in'] }).notNull(),
+		// Net amount moved in this transaction, base units, decimal string.
+		amount: text('amount').notNull(),
+		occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+		counterparty: text('counterparty'),
+		source: text('source', { enum: ['chain', 'manual', 'seed'] })
+			.notNull()
+			.default('chain'),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.$defaultFn(() => new Date())
+	},
+	(t) => [
+		index('movement_project_idx').on(t.projectId),
+		index('movement_bucket_idx').on(t.bucketId),
+		uniqueIndex('movement_project_tx_dir_unq').on(t.projectId, t.txHash, t.direction)
+	]
+);
+
 export const projectRelations = relations(project, ({ one, many }) => ({
 	owner: one(user, { fields: [project.ownerId], references: [user.id] }),
 	buckets: many(bucket),
+	movements: many(tokenMovement),
 	wallets: many(controlledWallet),
 	tags: many(transactionTag),
 	anchors: many(anchorRecord)
@@ -175,6 +207,11 @@ export const transactionTagRelations = relations(transactionTag, ({ one }) => ({
 
 export const anchorRecordRelations = relations(anchorRecord, ({ one }) => ({
 	project: one(project, { fields: [anchorRecord.projectId], references: [project.id] })
+}));
+
+export const tokenMovementRelations = relations(tokenMovement, ({ one }) => ({
+	project: one(project, { fields: [tokenMovement.projectId], references: [project.id] }),
+	bucket: one(bucket, { fields: [tokenMovement.bucketId], references: [bucket.id] })
 }));
 
 export * from './auth.schema';
