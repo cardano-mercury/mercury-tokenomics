@@ -33,6 +33,8 @@ npm run dev
 
 Then open the address printed by the dev server. The app defaults to the Cardano Preprod test network.
 
+The home page introduces the tool and links to Get started (account creation) and Browse projects (the public directory). A light and dark theme toggle sits in the top navigation.
+
 ## For project operators (planned)
 
 The operator flow follows the requirements in the PRD.

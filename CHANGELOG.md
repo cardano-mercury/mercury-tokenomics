@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-29
+
+### Added
+
+- Tailwind CSS with the full Mercury design system from the style guide: theme tokens (colors, fonts, radii, shadows), light and dark modes via a data-theme attribute, and reusable component classes (cards, buttons, inputs).
+- Geist and JetBrains Mono web fonts and the Lucide icon set.
+- Application shell with header navigation, a theme toggle, a footer, and a sign-out endpoint.
+- Marketing landing page.
+- Shared display formatting utilities (`src/lib/format.ts`) for amounts, addresses, dates, and percentages, with 12 unit tests.
+
 ## [0.1.0] - 2026-06-29
 
 ### Added
