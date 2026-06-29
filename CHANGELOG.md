@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-29
+
+### Added
+
+- Project management in the dashboard: create a project (name, policy id, asset name, decimals, total supply, token generation date, network), edit its details, and manage its buckets and controlled wallets.
+- Bucket editor with allocation, first unlock, cliff, vesting length, and vesting type, with a running allocated-versus-supply total.
+- Controlled wallet declaration with optional label and bucket assignment. Wallets start unverified; cryptographic ownership proof is a later milestone.
+- Pure project and bucket validation with slug generation and base-unit parsing (`src/lib/projects/validation.ts`), with unit tests.
+- Pure movement classification module (`src/lib/tokenomics/classify.ts`) that separates internal transfers from external outflows against the controlled set, with unit tests.
+- Pure on-chain anchoring module (`src/lib/tokenomics/anchor.ts`): deterministic declaration canonicalization, blake2b-256 hashing, metadata construction, and verification, with unit tests.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

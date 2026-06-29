@@ -41,11 +41,11 @@ The operator flow follows the requirements in the PRD.
 
 Create an account using email with a password, or sign in with a magic link. In local development the magic link is printed to the server console rather than emailed. Once signed in, you can enable TOTP two-factor authentication from the dashboard security page; it then applies at every sign-in.
 
-Create a project by providing its name, the token policy id, and the token generation or sale date that anchors all schedules.
+Create a project from the dashboard by providing its name, the token policy id, asset name, decimals, total supply, network, and the token generation date (T0) that anchors all schedules. You can edit these details at any time.
 
-Define buckets. Each bucket has a name (for example Founders, Public, Investors), an allocation, an optional cliff in months, a vesting length in months, a vesting type (linear, cliff-based, accelerated, or custom), and an optional first-unlock lump sum released at the start.
+Define buckets on the project page. Each bucket has a name (for example Founders, Public, Investors), an allocation, an optional cliff in months, a vesting length in months, a vesting type (linear, cliff-based, accelerated, or custom), and an optional first-unlock lump sum released at T0. The page shows how much of the total supply has been allocated across buckets.
 
-Declare the wallets the project controls and assign them to buckets where appropriate. For each wallet you prove control by signing a short challenge with that wallet, which ties the declared address to a key you hold.
+Declare the wallets the project controls and assign them to buckets where appropriate. Wallets are currently recorded as unverified; cryptographic ownership proof by signing a challenge with the wallet is a later milestone.
 
 Anchor the declaration on-chain. The tool publishes a compact record to Cardano transaction metadata so the declaration is timestamped and tamper-evident. Re-anchoring after changes creates a new version.
 
