@@ -31,6 +31,8 @@ npm run db:migrate
 npm run dev
 ```
 
+To explore with sample content, load the demo projects first with `npm run db:seed`. This adds two public statements (Helios Protocol and Acme DAO) you can browse without an account.
+
 Then open the address printed by the dev server. The app defaults to the Cardano Preprod test network.
 
 The home page introduces the tool and links to Get started (account creation) and Browse projects (the public directory). A light and dark theme toggle sits in the top navigation.

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-29
+
+### Added
+
+- Seed script (`npm run db:seed`) that loads two demo projects (Helios Protocol and Acme DAO) with buckets, wallets, and movements so the app is explorable immediately. Idempotent and re-runnable.
+
 ## [0.6.0] - 2026-06-29
 
 ### Added

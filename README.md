@@ -19,10 +19,11 @@ cp .env.example .env
 
 Edit `.env`: set `DATABASE_URL` (defaults to `local.db`), `ORIGIN` (for example `http://localhost:5173`), and a high-entropy `BETTER_AUTH_SECRET`.
 
-Create the database and run the app:
+Create the database, optionally load demo data, and run the app:
 
 ```sh
 npm run db:migrate
+npm run db:seed   # optional: two demo projects to explore
 npm run dev
 ```
 
@@ -30,7 +31,7 @@ npm run dev
 
 - `npm run dev` runs the dev server, `npm run build` and `npm run preview` produce and serve a production build.
 - `npm test` runs unit tests, `npm run check` type-checks, `npm run lint` and `npm run format` handle code style.
-- `npm run db:generate` then `npm run db:migrate` create and apply schema migrations. `npm run db:studio` opens Drizzle Studio.
+- `npm run db:generate` then `npm run db:migrate` create and apply schema migrations. `npm run db:studio` opens Drizzle Studio. `npm run db:seed` loads demo projects.
 - `npm run auth:schema` regenerates the Better Auth tables after changing auth config.
 
 ## License
