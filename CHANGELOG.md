@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
+### Added
+
+- Account authentication with Better Auth: email and password sign up and sign in, passwordless magic link (dev transport logs the link to the server console), and TOTP two-factor authentication with backup codes.
+- Auth routes: signup, login (with a magic-link option), the two-factor sign-in challenge, a protected dashboard listing the account's projects, and a security page to enable or disable two-factor.
+- Pure auth input validation (`src/lib/auth/validation.ts`) with unit tests.
+- Swappable outbound email module (`src/lib/server/email.ts`).
+- `two_factor` table and the user two-factor column via a new migration.
+
 ## [0.2.0] - 2026-06-29
 
 ### Added

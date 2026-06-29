@@ -39,7 +39,7 @@ The home page introduces the tool and links to Get started (account creation) an
 
 The operator flow follows the requirements in the PRD.
 
-Create an account using email with a password or a magic link, and optionally enable two-factor authentication.
+Create an account using email with a password, or sign in with a magic link. In local development the magic link is printed to the server console rather than emailed. Once signed in, you can enable TOTP two-factor authentication from the dashboard security page; it then applies at every sign-in.
 
 Create a project by providing its name, the token policy id, and the token generation or sale date that anchors all schedules.
 
