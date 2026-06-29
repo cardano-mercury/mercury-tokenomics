@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1782767870000,
-      "tag": "0000_ancient_scarecrow",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1782767906808,
-      "tag": "0001_brief_lady_mastermind",
+      "when": 1782769726506,
+      "tag": "0000_sturdy_domino",
       "breakpoints": true
     }
   ]
