@@ -33,6 +33,10 @@ export const project = sqliteTable(
 		network: text('network', { enum: ['mainnet', 'preprod', 'preview'] })
 			.notNull()
 			.default('preprod'),
+		// Draft projects are private to their owner; published projects are public.
+		status: text('status', { enum: ['draft', 'published'] })
+			.notNull()
+			.default('draft'),
 		policyId: text('policy_id').notNull(),
 		assetNameHex: text('asset_name_hex').notNull().default(''),
 		decimals: integer('decimals').notNull().default(0),

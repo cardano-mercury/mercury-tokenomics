@@ -25,9 +25,13 @@ function hexToTicker(hex: string): string {
 	}
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	const [proj] = await db.select().from(project).where(eq(project.slug, params.slug));
 	if (!proj) return error(404, 'Project not found');
+
+	const isOwner = locals.user?.id === proj.ownerId;
+	// Drafts are visible only to their owner, as a preview.
+	if (proj.status !== 'published' && !isOwner) return error(404, 'Project not found');
 
 	const buckets = await db
 		.select()
@@ -88,10 +92,12 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	return {
+		preview: proj.status !== 'published' && isOwner,
 		project: {
 			name: proj.name,
 			slug: proj.slug,
 			network: proj.network,
+			status: proj.status,
 			policyId: proj.policyId,
 			description: proj.description,
 			website: proj.website,

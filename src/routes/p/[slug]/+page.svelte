@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ShieldCheck, ShieldAlert, Globe, Download } from 'lucide-svelte';
+	import { ShieldCheck, ShieldAlert, Globe, Download, Eye } from 'lucide-svelte';
 	import CompareBars from '$lib/components/charts/CompareBars.svelte';
 	import DonutChart from '$lib/components/charts/DonutChart.svelte';
 	import LineChart from '$lib/components/charts/LineChart.svelte';
@@ -29,6 +29,17 @@
 </script>
 
 <svelte:head><title>{data.project.name}, tokenomics statement</title></svelte:head>
+
+{#if data.preview}
+	<div
+		class="mb-4 flex items-center justify-between rounded-md border border-ink-200 bg-ink-100 px-4 py-3 text-sm"
+	>
+		<span class="flex items-center gap-2 text-ink-600">
+			<Eye size={16} /> Draft preview, visible only to you. Publish from the dashboard to make it public.
+		</span>
+		<a href="/dashboard" class="font-semibold text-ink-900">Dashboard</a>
+	</div>
+{/if}
 
 <!-- Status bar -->
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

@@ -260,5 +260,17 @@ export const actions: Actions = {
 			.delete(tokenMovement)
 			.where(and(eq(tokenMovement.id, movementId), eq(tokenMovement.projectId, owned.id)));
 		return { scope: 'movement', ok: true };
+	},
+
+	setStatus: async (event) => {
+		const user = event.locals.user;
+		if (!user) return redirect(302, '/login');
+		const owned = await ownedProject(user.id, event.params.id);
+		if (!owned) return error(404, 'Project not found');
+
+		const form = await event.request.formData();
+		const status = form.get('status')?.toString() === 'published' ? 'published' : 'draft';
+		await db.update(project).set({ status }).where(eq(project.id, owned.id));
+		return { scope: 'status', ok: true, status };
 	}
 };

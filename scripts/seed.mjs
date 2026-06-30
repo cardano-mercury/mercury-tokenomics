@@ -156,8 +156,8 @@ const insertUser = db.prepare(
 );
 const deleteProjectBySlug = db.prepare('DELETE FROM project WHERE slug = ?');
 const insertProject = db.prepare(
-	`INSERT INTO project (id, owner_id, name, slug, network, policy_id, asset_name_hex, decimals, total_supply, t0, description, website, created_at, updated_at)
-	 VALUES (@id, @owner_id, @name, @slug, 'preprod', @policy_id, @asset_name_hex, 6, @total_supply, @t0, @description, @website, @created_at, @updated_at)`
+	`INSERT INTO project (id, owner_id, name, slug, network, status, policy_id, asset_name_hex, decimals, total_supply, t0, description, website, created_at, updated_at)
+	 VALUES (@id, @owner_id, @name, @slug, 'preprod', 'published', @policy_id, @asset_name_hex, 6, @total_supply, @t0, @description, @website, @created_at, @updated_at)`
 );
 const insertBucket = db.prepare(
 	`INSERT INTO bucket (id, project_id, name, allocation, cliff_months, vesting_months, vesting_type, first_unlock, sort_order, created_at, updated_at)

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-29
+
+### Added
+
+- Project draft and published status. New projects start as drafts that are private to their owner. Owners can preview the full statement (shown with a draft banner) and publish or unpublish from the project page. Only published projects appear in the public directory and can be viewed or exported by others.
+
 ## [0.7.0] - 2026-06-29
 
 ### Added

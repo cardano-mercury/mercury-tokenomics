@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
 	const projects = await db
@@ -13,6 +13,7 @@ export const load: PageServerLoad = async () => {
 			updatedAt: project.updatedAt
 		})
 		.from(project)
+		.where(eq(project.status, 'published'))
 		.orderBy(desc(project.updatedAt));
 
 	return { projects };

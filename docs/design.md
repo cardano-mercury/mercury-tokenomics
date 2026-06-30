@@ -31,7 +31,7 @@ All money amounts are stored as integer base units (no floats) to avoid rounding
 
 Account, session, and related auth tables are managed by Better Auth.
 
-Project: owner account, display name, URL slug, network, token policy id, token asset name, decimals, total supply, the token generation or sale date that anchors schedules (call it T0), and free-form description and links.
+Project: owner account, display name, URL slug, network, draft or published status (drafts are private to the owner), token policy id, token asset name, decimals, total supply, the token generation or sale date that anchors schedules (call it T0), and free-form description and links.
 
 Bucket: belongs to a project. Name, allocation as base units (and derived percent of supply), cliff in months, vesting length in months, vesting type (linear, cliff-based, accelerated, custom), an optional first-unlock or lump-sum amount released at T0, an optional per-bucket T0 override, and a custom curve payload for the custom type. Display order is stored so the editor and charts stay stable.
 

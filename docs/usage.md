@@ -45,6 +45,8 @@ Create an account using email with a password, or sign in with a magic link. In 
 
 Create a project from the dashboard by providing its name, the token policy id, asset name, decimals, total supply, network, and the token generation date (T0) that anchors all schedules. You can edit these details at any time.
 
+New projects start as drafts, visible only to you. Use Preview statement on the project page to see exactly how the public report will look while you fill in the details, then Publish to make it public. You can unpublish at any time to take it private again. Drafts do not appear in the public directory and cannot be opened or exported by anyone else.
+
 Define buckets on the project page. Each bucket has a name (for example Founders, Public, Investors), an allocation, an optional cliff in months, a vesting length in months, a vesting type (linear, cliff-based, accelerated, or custom), and an optional first-unlock lump sum released at T0. The page shows how much of the total supply has been allocated across buckets.
 
 Declare the wallets the project controls and assign them to buckets where appropriate. Wallets are currently recorded as unverified; cryptographic ownership proof by signing a challenge with the wallet is a later milestone.

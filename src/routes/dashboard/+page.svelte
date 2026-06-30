@@ -42,9 +42,16 @@
 				<a href="/dashboard/projects/{p.id}" class="card block p-6 transition hover:shadow-pop">
 					<div class="flex items-center justify-between">
 						<h2 class="text-lg font-semibold text-ink-900">{p.name}</h2>
-						<span class="data rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-600"
-							>{p.network}</span
-						>
+						{#if p.status === 'published'}
+							<span
+								class="rounded-full bg-mercury-050 px-2 py-0.5 text-xs font-medium text-mercury-ink"
+								>Published</span
+							>
+						{:else}
+							<span class="rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600"
+								>Draft</span
+							>
+						{/if}
 					</div>
 					<p class="data mt-2 truncate text-xs text-ink-400">{p.policyId}</p>
 					<p class="mt-3 text-xs text-ink-400">Updated {formatDateISO(new Date(p.updatedAt))}</p>

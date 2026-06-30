@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Trash2, ExternalLink, Wallet, RefreshCw, Link2 } from 'lucide-svelte';
+	import { Trash2, Eye, Globe, Wallet, RefreshCw, Link2 } from 'lucide-svelte';
 	import { formatAmount, formatDateISO, truncateMiddle } from '$lib/format';
 	import { VESTING_TYPES } from '$lib/projects/validation';
 	import type { ActionData, PageData } from './$types';
@@ -17,15 +17,39 @@
 <div class="flex flex-wrap items-end justify-between gap-3">
 	<div>
 		<p class="eyebrow">Project</p>
-		<h1 class="text-2xl font-bold text-ink-900">{data.project.name}</h1>
+		<div class="flex items-center gap-3">
+			<h1 class="text-2xl font-bold text-ink-900">{data.project.name}</h1>
+			{#if data.project.status === 'published'}
+				<span
+					class="rounded-full bg-mercury-050 px-2.5 py-0.5 text-xs font-medium text-mercury-ink"
+				>
+					Published
+				</span>
+			{:else}
+				<span class="rounded-full bg-ink-100 px-2.5 py-0.5 text-xs font-medium text-ink-600">
+					Draft
+				</span>
+			{/if}
+		</div>
 	</div>
 	<div class="flex items-center gap-2">
 		<a href="/dashboard/projects/{data.project.id}/anchor" class="btn btn-ghost">
 			<Link2 size={18} /> Anchor
 		</a>
 		<a href="/p/{data.project.slug}" class="btn btn-ghost">
-			<ExternalLink size={18} /> View public statement
+			<Eye size={18} /> Preview statement
 		</a>
+		{#if data.project.status === 'published'}
+			<form method="post" action="?/setStatus" use:enhance>
+				<input type="hidden" name="status" value="draft" />
+				<button class="btn btn-ghost">Unpublish</button>
+			</form>
+		{:else}
+			<form method="post" action="?/setStatus" use:enhance>
+				<input type="hidden" name="status" value="published" />
+				<button class="btn btn-affirmative"><Globe size={18} /> Publish</button>
+			</form>
+		{/if}
 	</div>
 </div>
 

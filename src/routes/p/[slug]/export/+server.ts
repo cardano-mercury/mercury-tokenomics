@@ -8,9 +8,13 @@ import { assembleStatement } from '$lib/tokenomics/statement';
 import { statementRows, statementTotalRow } from '$lib/tokenomics/export';
 import { formatDateISO } from '$lib/format';
 
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, locals }) => {
 	const [proj] = await db.select().from(project).where(eq(project.slug, params.slug));
 	if (!proj) return error(404, 'Project not found');
+	// Drafts can only be exported by their owner.
+	if (proj.status !== 'published' && locals.user?.id !== proj.ownerId) {
+		return error(404, 'Project not found');
+	}
 
 	const buckets = await db
 		.select()
