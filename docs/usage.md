@@ -61,7 +61,7 @@ Tag transactions to explain or reclassify specific movements (for example a CEX 
 
 ## For reviewers
 
-Browse the directory of participating projects at Projects, and open one to see its statement. No account is needed.
+Browse the directory of participating projects at Projects, and open one to see its statement. No account is needed. The directory supports searching by name or description, filtering by network, and pagination; the search, filter, and page are kept in the URL so a particular view can be shared.
 
 The statement presents Promised versus Delivered. Promised is what the schedule says should be unlocked at a given time; Delivered is what has actually been distributed out of the project's controlled wallets. Move the date scrubber to see how adherence has evolved, read the per-bucket bars and the promised and delivered distribution donuts, and follow the adherence-over-time chart. Overall totals and the delivered share are shown at a glance.
 

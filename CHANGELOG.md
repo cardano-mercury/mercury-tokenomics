@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-29
+
+### Added
+
+- Search, network filtering, and pagination on the public projects directory. State lives in the URL (`q`, `network`, `page`) so results are shareable, with a result count and previous/next controls.
+
 ## [0.8.0] - 2026-06-29
 
 ### Added
