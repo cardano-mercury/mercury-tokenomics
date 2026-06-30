@@ -1,1 +1,0 @@
-ALTER TABLE `project` ADD `status` text DEFAULT 'draft' NOT NULL;

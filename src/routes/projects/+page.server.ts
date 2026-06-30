@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
-import { and, or, eq, like, desc, count, type SQL } from 'drizzle-orm';
+import { and, or, eq, ilike, desc, count, type SQL } from 'drizzle-orm';
 import { NETWORKS } from '$lib/projects/validation';
 
 const PAGE_SIZE = 9;
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	const conditions: SQL[] = [eq(project.status, 'published')];
 	if (q) {
 		const term = `%${q}%`;
-		const match = or(like(project.name, term), like(project.description, term));
+		const match = or(ilike(project.name, term), ilike(project.description, term));
 		if (match) conditions.push(match);
 	}
 	if (network) conditions.push(eq(project.network, network as 'mainnet' | 'preprod' | 'preview'));

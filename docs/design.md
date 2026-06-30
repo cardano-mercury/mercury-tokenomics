@@ -11,9 +11,9 @@ The tool lets a project declare its intended tokenomics (buckets, allocations, c
 - SvelteKit (TypeScript) for the full-stack app, server routes and form actions on the same deployment.
 - MeshJS for wallet connection, CIP-8 signing, and building the on-chain anchoring transaction.
 - Koios as the chain indexer for balances and transaction history, network-selectable.
-- SQLite via Drizzle ORM for project profiles, drafts, bucket and wallet definitions, and manual transaction tags. Driver-swappable to Postgres later.
-- Better Auth for account identity: email and password or magic link, with TOTP two-factor.
-- LayerCake for the vesting and distribution charts.
+- The shared Postgres database (the same instance the other Mercury apps use) via Drizzle ORM, for project profiles, drafts, bucket and wallet definitions, manual transaction tags, and cached token movements. Tokenomics' own tables are prefixed `tokenomics_` in the shared public schema, and it keeps its own Drizzle migration journal.
+- Authentication and the shared user schema come from `@cardano-mercury/core`. Better Auth provides email and password or magic link, with TOTP two-factor. Because the apps share one database, one secret, and a parent-domain cookie, a session on either app is valid on both (single sign-on). The `user`/`session`/`account`/`verification`/`two_factor` tables are owned by core; tokenomics foreign-keys to `user` but does not create or migrate those tables.
+- Dependency-free SVG components for the vesting and distribution charts.
 
 Network is configurable through environment, defaulting to Preprod for development and demo. Mainnet is a config flip.
 

@@ -1,26 +1,25 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { user } from './auth.schema';
+import { user } from '@cardano-mercury/core/db';
 
 /**
- * Token amounts are stored as decimal strings of integer base units (no decimal
- * point), so arbitrary precision survives the round trip to the chain. The
- * domain layer parses them to bigint. Timestamps are stored as epoch
- * milliseconds. See docs/design.md for the data model rationale.
+ * Tokenomics-specific tables on the shared Postgres database. They are prefixed
+ * `tokenomics_` so they never collide with the other Mercury apps' tables in the
+ * shared public schema, and they foreign-key to the shared `user` table owned by
+ * mercury-core. Token amounts are decimal strings of integer base units (parsed
+ * to bigint in the domain layer); timestamps are timestamptz. See docs/design.md.
  */
 
 const timestamps = {
-	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
-		.$defaultFn(() => new Date()),
-	updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-		.notNull()
-		.$defaultFn(() => new Date())
+		.defaultNow()
 		.$onUpdate(() => new Date())
 };
 
-export const project = sqliteTable(
-	'project',
+export const project = pgTable(
+	'tokenomics_project',
 	{
 		id: text('id')
 			.primaryKey()
@@ -43,16 +42,19 @@ export const project = sqliteTable(
 		// Total supply in base units, decimal string.
 		totalSupply: text('total_supply').notNull().default('0'),
 		// Token generation / sale date that anchors all schedules (T0).
-		t0: integer('t0', { mode: 'timestamp_ms' }).notNull(),
+		t0: timestamp('t0', { withTimezone: true }).notNull(),
 		description: text('description'),
 		website: text('website'),
 		...timestamps
 	},
-	(t) => [uniqueIndex('project_slug_unq').on(t.slug), index('project_owner_idx').on(t.ownerId)]
+	(t) => [
+		uniqueIndex('tokenomics_project_slug_unq').on(t.slug),
+		index('tokenomics_project_owner_idx').on(t.ownerId)
+	]
 );
 
-export const bucket = sqliteTable(
-	'bucket',
+export const bucket = pgTable(
+	'tokenomics_bucket',
 	{
 		id: text('id')
 			.primaryKey()
@@ -73,17 +75,17 @@ export const bucket = sqliteTable(
 		// Lump sum released at T0, base units, decimal string.
 		firstUnlock: text('first_unlock').notNull().default('0'),
 		// Optional per-bucket T0 override.
-		t0Override: integer('t0_override', { mode: 'timestamp_ms' }),
+		t0Override: timestamp('t0_override', { withTimezone: true }),
 		// JSON array of { monthsAfterT0, cumulativeFraction } for the custom type.
 		customCurve: text('custom_curve'),
 		sortOrder: integer('sort_order').notNull().default(0),
 		...timestamps
 	},
-	(t) => [index('bucket_project_idx').on(t.projectId)]
+	(t) => [index('tokenomics_bucket_project_idx').on(t.projectId)]
 );
 
-export const controlledWallet = sqliteTable(
-	'controlled_wallet',
+export const controlledWallet = pgTable(
+	'tokenomics_controlled_wallet',
 	{
 		id: text('id')
 			.primaryKey()
@@ -97,18 +99,18 @@ export const controlledWallet = sqliteTable(
 		label: text('label'),
 		// JSON CIP-8 proof { signature, key } captured when ownership was proven.
 		ownershipProof: text('ownership_proof'),
-		verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+		verifiedAt: timestamp('verified_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [
-		index('wallet_project_idx').on(t.projectId),
-		index('wallet_bucket_idx').on(t.bucketId),
-		uniqueIndex('wallet_project_address_unq').on(t.projectId, t.address)
+		index('tokenomics_wallet_project_idx').on(t.projectId),
+		index('tokenomics_wallet_bucket_idx').on(t.bucketId),
+		uniqueIndex('tokenomics_wallet_project_address_unq').on(t.projectId, t.address)
 	]
 );
 
-export const transactionTag = sqliteTable(
-	'transaction_tag',
+export const transactionTag = pgTable(
+	'tokenomics_transaction_tag',
 	{
 		id: text('id')
 			.primaryKey()
@@ -125,11 +127,14 @@ export const transactionTag = sqliteTable(
 		note: text('note'),
 		...timestamps
 	},
-	(t) => [index('tag_project_idx').on(t.projectId), index('tag_tx_idx').on(t.txHash)]
+	(t) => [
+		index('tokenomics_tag_project_idx').on(t.projectId),
+		index('tokenomics_tag_tx_idx').on(t.txHash)
+	]
 );
 
-export const anchorRecord = sqliteTable(
-	'anchor_record',
+export const anchorRecord = pgTable(
+	'tokenomics_anchor_record',
 	{
 		id: text('id')
 			.primaryKey()
@@ -143,19 +148,17 @@ export const anchorRecord = sqliteTable(
 		txHash: text('tx_hash').notNull(),
 		network: text('network', { enum: ['mainnet', 'preprod', 'preview'] }).notNull(),
 		payloadUri: text('payload_uri'),
-		anchoredAt: integer('anchored_at', { mode: 'timestamp_ms' }).notNull(),
-		createdAt: integer('created_at', { mode: 'timestamp_ms' })
-			.notNull()
-			.$defaultFn(() => new Date())
+		anchoredAt: timestamp('anchored_at', { withTimezone: true }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
-		index('anchor_project_idx').on(t.projectId),
-		uniqueIndex('anchor_project_version_unq').on(t.projectId, t.version)
+		index('tokenomics_anchor_project_idx').on(t.projectId),
+		uniqueIndex('tokenomics_anchor_project_version_unq').on(t.projectId, t.version)
 	]
 );
 
-export const tokenMovement = sqliteTable(
-	'token_movement',
+export const tokenMovement = pgTable(
+	'tokenomics_token_movement',
 	{
 		id: text('id')
 			.primaryKey()
@@ -169,19 +172,17 @@ export const tokenMovement = sqliteTable(
 		direction: text('direction', { enum: ['out', 'in'] }).notNull(),
 		// Net amount moved in this transaction, base units, decimal string.
 		amount: text('amount').notNull(),
-		occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+		occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
 		counterparty: text('counterparty'),
 		source: text('source', { enum: ['chain', 'manual', 'seed'] })
 			.notNull()
 			.default('chain'),
-		createdAt: integer('created_at', { mode: 'timestamp_ms' })
-			.notNull()
-			.$defaultFn(() => new Date())
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
-		index('movement_project_idx').on(t.projectId),
-		index('movement_bucket_idx').on(t.bucketId),
-		uniqueIndex('movement_project_tx_dir_unq').on(t.projectId, t.txHash, t.direction)
+		index('tokenomics_movement_project_idx').on(t.projectId),
+		index('tokenomics_movement_bucket_idx').on(t.bucketId),
+		uniqueIndex('tokenomics_movement_project_tx_dir_unq').on(t.projectId, t.txHash, t.direction)
 	]
 );
 
@@ -218,4 +219,5 @@ export const tokenMovementRelations = relations(tokenMovement, ({ one }) => ({
 	bucket: one(bucket, { fields: [tokenMovement.bucketId], references: [bucket.id] })
 }));
 
-export * from './auth.schema';
+// Shared Better Auth tables (user/session/account/verification/two_factor) owned by mercury-core.
+export * from '@cardano-mercury/core/db';

@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-06-30
+
+### Changed
+
+- Migrated the database from SQLite to the shared Postgres database used by the other Mercury apps. Tokenomics' own tables are now Postgres tables prefixed `tokenomics_` in the shared public schema, with their own migration journal (`__drizzle_migrations_tokenomics`) so histories do not collide.
+- Authentication now comes from the shared `@cardano-mercury/core` package. The Better Auth `user`/`session`/`account`/`verification`/`two_factor` tables are shared, so an account works across the Mercury apps (single sign-on with a shared secret and a parent-domain cookie). Email/password and two-factor come from core; magic link and its email transport stay app-side.
+- Bumped `better-auth` to `^1.6.23` to match the other apps, removed `better-sqlite3`, added `postgres`. The project directory search uses `ilike` for case-insensitive matching on Postgres.
+
+### Notes
+
+- Local development uses the shared Postgres from financials' compose (`localhost:5544/local`). For SSO, set `BETTER_AUTH_SECRET` identically across apps and `COOKIE_DOMAIN` (e.g. `.cardano-mercury.com`) in production.
+- mercury-core is consumed via a `file:` link; its peer `drizzle-orm` is deduped (Vite `resolve.dedupe` and a tsconfig alias) so the app and core share one instance.
+
 ## [0.9.0] - 2026-06-29
 
 ### Added

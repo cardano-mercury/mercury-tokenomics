@@ -1,7 +1,7 @@
 {
 	"name": "mercury-tokenomics",
 	"private": true,
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -18,11 +18,9 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-		"db:seed": "node scripts/seed.mjs",
-		"auth:schema": "better-auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
+		"db:seed": "node scripts/seed.mjs"
 	},
 	"devDependencies": {
-		"@better-auth/cli": "~1.4.21",
 		"@eslint/js": "^10.0.1",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.63.0",
@@ -30,9 +28,7 @@
 		"@tailwindcss/forms": "^0.5.11",
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.3.0",
-		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^22",
-		"better-auth": "~1.4.21",
 		"drizzle-kit": "^0.31.10",
 		"drizzle-orm": "^0.45.2",
 		"eslint": "^10.4.1",
@@ -51,9 +47,11 @@
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"@cardano-mercury/core": "file:../mercury-core",
 		"@noble/hashes": "^2.2.0",
-		"better-sqlite3": "^12.10.0",
+		"better-auth": "^1.6.23",
 		"exceljs": "^4.4.0",
-		"lucide-svelte": "^1.0.1"
+		"lucide-svelte": "^1.0.1",
+		"postgres": "^3.4.9"
 	}
 }

@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { auth } from '$lib/server/auth';
+import { auth, authApi } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 import { isValidEmail } from '$lib/auth/validation';
 
@@ -38,7 +38,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await auth.api.signInMagicLink({
+			await authApi.signInMagicLink({
 				body: { email, callbackURL: '/dashboard' },
 				headers: event.request.headers
 			});

@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { auth } from '$lib/server/auth';
+import { authApi } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -16,7 +16,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const password = form.get('password')?.toString() ?? '';
 		try {
-			const result = await auth.api.enableTwoFactor({
+			const result = await authApi.enableTwoFactor({
 				body: { password },
 				headers: event.request.headers
 			});
@@ -37,7 +37,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const code = form.get('code')?.toString().trim() ?? '';
 		try {
-			await auth.api.verifyTOTP({ body: { code }, headers: event.request.headers });
+			await authApi.verifyTOTP({ body: { code }, headers: event.request.headers });
 		} catch (error) {
 			if (error instanceof APIError) {
 				return fail(400, { stage: 'verify', message: 'That code was not valid.' });
@@ -51,7 +51,7 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const password = form.get('password')?.toString() ?? '';
 		try {
-			await auth.api.disableTwoFactor({ body: { password }, headers: event.request.headers });
+			await authApi.disableTwoFactor({ body: { password }, headers: event.request.headers });
 		} catch (error) {
 			if (error instanceof APIError) {
 				return fail(400, { stage: 'disable', message: error.message || 'Could not disable.' });

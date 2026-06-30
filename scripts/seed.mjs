@@ -1,22 +1,23 @@
 /**
  * Seeds demo projects so the app is explorable immediately. Idempotent: it
- * removes the demo projects by slug and reinserts them. The demo owner is a
- * placeholder user; the seeded projects are visible on the public directory and
- * statement pages without signing in. Run with: npm run db:seed
+ * removes the demo projects by slug and reinserts them. The demo owner is a row
+ * in the shared `user` table; the seeded projects are published and visible on
+ * the public directory and statement pages without signing in.
+ * Run with: npm run db:seed
  */
-import Database from 'better-sqlite3';
+import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 
-const DB_PATH = process.env.DATABASE_URL || 'local.db';
-const db = new Database(DB_PATH);
-db.pragma('foreign_keys = ON');
+const DB_URL = process.env.DATABASE_URL || 'postgres://root:mysecretpassword@localhost:5544/local';
+const sql = postgres(DB_URL);
 
 const MS_PER_MONTH = 2_629_800_000;
-const now = Date.now();
+const now = new Date();
 const unit = (tokens) => (BigInt(tokens) * 1_000_000n).toString(); // 6 decimals
-const monthsAgo = (m) => now - m * MS_PER_MONTH;
+const monthsAgo = (m) => new Date(now.getTime() - m * MS_PER_MONTH);
+const afterT0 = (t0, months) => new Date(t0.getTime() + months * MS_PER_MONTH);
 
-const OWNER_ID = 'seed-owner-0000-0000-000000000000';
+const OWNER_ID = 'tokenomics-seed-owner';
 
 const projects = [
 	{
@@ -150,96 +151,98 @@ const projects = [
 	}
 ];
 
-const insertUser = db.prepare(
-	`INSERT OR IGNORE INTO user (id, name, email, email_verified, created_at, updated_at)
-	 VALUES (?, ?, ?, 1, ?, ?)`
-);
-const deleteProjectBySlug = db.prepare('DELETE FROM project WHERE slug = ?');
-const insertProject = db.prepare(
-	`INSERT INTO project (id, owner_id, name, slug, network, status, policy_id, asset_name_hex, decimals, total_supply, t0, description, website, created_at, updated_at)
-	 VALUES (@id, @owner_id, @name, @slug, 'preprod', 'published', @policy_id, @asset_name_hex, 6, @total_supply, @t0, @description, @website, @created_at, @updated_at)`
-);
-const insertBucket = db.prepare(
-	`INSERT INTO bucket (id, project_id, name, allocation, cliff_months, vesting_months, vesting_type, first_unlock, sort_order, created_at, updated_at)
-	 VALUES (@id, @project_id, @name, @allocation, @cliff_months, @vesting_months, @vesting_type, @first_unlock, @sort_order, @created_at, @updated_at)`
-);
-const insertWallet = db.prepare(
-	`INSERT INTO controlled_wallet (id, project_id, bucket_id, address, label, created_at, updated_at)
-	 VALUES (@id, @project_id, @bucket_id, @address, @label, @created_at, @updated_at)`
-);
-const insertMovement = db.prepare(
-	`INSERT INTO token_movement (id, project_id, bucket_id, tx_hash, direction, amount, occurred_at, source, created_at)
-	 VALUES (@id, @project_id, @bucket_id, @tx_hash, 'out', @amount, @occurred_at, 'seed', @created_at)`
-);
-
-const seed = db.transaction(() => {
-	insertUser.run(OWNER_ID, 'Demo Owner', 'demo-owner@example.com', now, now);
-
-	for (const p of projects) {
-		deleteProjectBySlug.run(p.slug);
-		const projectId = randomUUID();
-		insertProject.run({
-			id: projectId,
-			owner_id: OWNER_ID,
-			name: p.name,
-			slug: p.slug,
-			policy_id: p.policyId,
-			asset_name_hex: p.assetNameHex,
-			total_supply: p.totalSupply,
-			t0: p.t0,
-			description: p.description,
-			website: p.website,
+await sql.begin(async (sql) => {
+	await sql`
+		insert into "user" ${sql({
+			id: OWNER_ID,
+			name: 'Demo Owner',
+			email: 'demo-owner@example.com',
+			email_verified: true,
 			created_at: now,
 			updated_at: now
-		});
+		})}
+		on conflict (id) do nothing
+	`;
+
+	for (const p of projects) {
+		await sql`delete from tokenomics_project where slug = ${p.slug}`;
+
+		const projectId = randomUUID();
+		await sql`
+			insert into tokenomics_project ${sql({
+				id: projectId,
+				owner_id: OWNER_ID,
+				name: p.name,
+				slug: p.slug,
+				network: 'preprod',
+				status: 'published',
+				policy_id: p.policyId,
+				asset_name_hex: p.assetNameHex,
+				decimals: 6,
+				total_supply: p.totalSupply,
+				t0: p.t0,
+				description: p.description,
+				website: p.website,
+				created_at: now,
+				updated_at: now
+			})}
+		`;
 
 		const bucketIds = {};
-		p.buckets.forEach((b, i) => {
+		for (let i = 0; i < p.buckets.length; i++) {
+			const b = p.buckets[i];
 			const bucketId = randomUUID();
 			bucketIds[b.name] = bucketId;
-			insertBucket.run({
-				id: bucketId,
-				project_id: projectId,
-				name: b.name,
-				allocation: unit(b.alloc),
-				cliff_months: b.cliff,
-				vesting_months: b.vest,
-				vesting_type: b.type,
-				first_unlock: unit(b.first),
-				sort_order: i,
-				created_at: now,
-				updated_at: now
-			});
-
-			for (const [monthsAfterT0, tokens] of b.delivered) {
-				insertMovement.run({
-					id: randomUUID(),
+			await sql`
+				insert into tokenomics_bucket ${sql({
+					id: bucketId,
 					project_id: projectId,
-					bucket_id: bucketId,
-					tx_hash: `seed-${randomUUID().slice(0, 12)}`,
-					amount: unit(tokens),
-					occurred_at: p.t0 + monthsAfterT0 * MS_PER_MONTH,
-					created_at: now
-				});
+					name: b.name,
+					allocation: unit(b.alloc),
+					cliff_months: b.cliff,
+					vesting_months: b.vest,
+					vesting_type: b.type,
+					first_unlock: unit(b.first),
+					sort_order: i,
+					created_at: now,
+					updated_at: now
+				})}
+			`;
+
+			for (const [months, tokens] of b.delivered) {
+				await sql`
+					insert into tokenomics_token_movement ${sql({
+						id: randomUUID(),
+						project_id: projectId,
+						bucket_id: bucketId,
+						tx_hash: `seed-${randomUUID().slice(0, 12)}`,
+						direction: 'out',
+						amount: unit(tokens),
+						occurred_at: afterT0(p.t0, months),
+						source: 'seed',
+						created_at: now
+					})}
+				`;
 			}
-		});
+		}
 
 		for (const w of p.wallets) {
-			insertWallet.run({
-				id: randomUUID(),
-				project_id: projectId,
-				bucket_id: bucketIds[w.bucket] ?? null,
-				address: w.address,
-				label: w.label,
-				created_at: now,
-				updated_at: now
-			});
+			await sql`
+				insert into tokenomics_controlled_wallet ${sql({
+					id: randomUUID(),
+					project_id: projectId,
+					bucket_id: bucketIds[w.bucket] ?? null,
+					address: w.address,
+					label: w.label,
+					created_at: now,
+					updated_at: now
+				})}
+			`;
 		}
 
 		console.log(`seeded ${p.name} (/${p.slug})`);
 	}
 });
 
-seed();
-db.close();
+await sql.end();
 console.log('Seed complete.');

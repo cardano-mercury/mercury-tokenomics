@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { auth } from '$lib/server/auth';
+import { authApi } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 
 export const load: PageServerLoad = ({ locals }) => {
@@ -15,7 +15,7 @@ export const actions: Actions = {
 		const trustDevice = form.get('trustDevice') === 'on';
 
 		try {
-			await auth.api.verifyTOTP({ body: { code, trustDevice } });
+			await authApi.verifyTOTP({ body: { code, trustDevice } });
 		} catch (error) {
 			if (error instanceof APIError) {
 				return fail(400, { message: 'That code was not valid. Try again.' });

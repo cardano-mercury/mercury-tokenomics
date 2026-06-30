@@ -1,33 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1782769726506,
-      "tag": "0000_sturdy_domino",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1782771741767,
-      "tag": "0001_lying_robbie_robertson",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1782772872798,
-      "tag": "0002_complete_gamora",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1782792987324,
-      "tag": "0003_rapid_madame_web",
+      "version": "7",
+      "when": 1782847371659,
+      "tag": "0000_clumsy_miek",
       "breakpoints": true
     }
   ]
