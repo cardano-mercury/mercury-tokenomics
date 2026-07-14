@@ -1,0 +1,115 @@
+name: CI
+
+# The quality gate. Runs on every pull request and push to `main` and `development`, and is what
+# branch protection on both requires before anything merges. It publishes nothing.
+#
+# It runs on `development` too, and not only on `main`: the fragments accumulate on `development`, so
+# a check that only guards `main` lets a pull request land there with no fragment, and the release
+# assembled from that branch silently misses it.
+#
+# The release workflows hang off this one succeeding, not off a push, so nothing is ever published or
+# proposed from a commit whose gate is red:
+#
+#   CI green on development -> release-pr.yml opens "Release vX.Y.Z" against main
+#   CI green on main        -> release.yml publishes the images, tags, and cuts the GitHub release
+
+on:
+  pull_request:
+    branches: [main, development]
+  push:
+    branches: [main, development]
+
+# A newer commit on a branch supersedes in-flight runs for that branch or PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Every PR to main must bump the version and describe the change. The release workflow tags
+  # v<version>, so an unbumped merge means a tag that already exists. The description is a new file
+  # under .changes/unreleased/ rather than an edit to CHANGELOG.md, so concurrent PRs cannot conflict
+  # over it. Only meaningful on a pull request, where there is a base to compare against.
+  changes:
+    name: Version and changelog
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The check diffs against the base branch, so it needs more than a shallow clone.
+          fetch-depth: 0
+
+      - run: git fetch --no-tags origin ${{ github.base_ref }}
+
+      - run: node scripts/check-changes.mjs origin/${{ github.base_ref }}
+
+  quality:
+    name: Lint, type-check, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci installs exactly what package-lock pins and fails if it is out of sync.
+      - run: npm ci
+
+      # Prettier formatting plus ESLint.
+      - run: npm run lint
+
+      # svelte-check over the app and its types.
+      - run: npm run check
+
+      # Coverage thresholds are enforced, not aspirational. They sit at the level the suite reaches,
+      # so coverage cannot regress.
+      - run: npm run test:coverage
+
+      # The production build must work with no environment at all. Server modules construct the
+      # database client and Better Auth lazily for exactly this reason: SvelteKit's postbuild analyse
+      # imports every server module, so a module-scope connection would make the build demand
+      # production secrets, and the Docker build (which has no .env, and should not) would fail.
+      - run: npm run build
+
+  images:
+    name: Build images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build both targets without pushing, so a Dockerfile regression fails the PR rather than the
+      # release. The runner serves traffic; the migrate image applies migrations and seeds.
+      - name: Build runner
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: false
+          load: true
+          tags: mercury-tokenomics:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build migrate
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          push: false
+          load: true
+          tags: mercury-tokenomics-migrate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Audit the image rather than assume it is clean. .dockerignore is read from the build context
+      # root, and getting that wrong is how a sibling repo shipped a live key into an image, where it
+      # went unnoticed because the image worked *because* the secret was in it.
+      - name: Audit images for secrets
+        run: scripts/audit-image.sh mercury-tokenomics:ci mercury-tokenomics-migrate:ci
