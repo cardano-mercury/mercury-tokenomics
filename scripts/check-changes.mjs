@@ -76,8 +76,18 @@ if (base !== null) {
 }
 
 // Rule 2: either a new change fragment, or (for a release PR) the version's changelog section.
-const changedFiles =
-	base === null ? [] : git(['diff', '--name-only', `${baseRef}...HEAD`]).split('\n');
+//
+// Diffed against the base ref itself, not gated on whether package.json existed there: the ref is
+// present either way, and gating on the file meant a first release saw no changed files at all and
+// so could never find its own fragments.
+let changedFiles = [];
+try {
+	changedFiles = git(['diff', '--name-only', `${baseRef}...HEAD`])
+		.split('\n')
+		.filter(Boolean);
+} catch {
+	fail(`Could not diff against ${baseRef}. The checkout needs full history (fetch-depth: 0).`);
+}
 
 const addedFragments = changedFiles.filter(
 	(f) => f.startsWith('.changes/unreleased/') && f.endsWith('.md')
