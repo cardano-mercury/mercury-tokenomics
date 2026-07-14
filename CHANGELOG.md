@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-07-14
+
+### Fixed
+
+- The migrate image no longer carries the repository's CI tooling. It copied `scripts/` wholesale, which
+  put the release and audit scripts into a production image, and the new secret audit failed the build
+  over it: `audit-image.sh` names the very keys it scans for. It now copies only the two scripts it
+  runs, `migrate.mjs` and `seed.mjs`.
+
 ## [0.16.0] - 2026-07-14
 
 ### Added

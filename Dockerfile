@@ -56,7 +56,11 @@ RUN printf '{"name":"tokenomics-migrate","private":true,"type":"module"}\n' > pa
 	&& npm cache clean --force
 
 COPY drizzle ./drizzle
-COPY scripts ./scripts
+
+# Only the two scripts this image runs. Copying scripts/ wholesale dragged the repository's CI tooling
+# into a production image, which has no business being there, and the secret audit rightly failed the
+# build over it: audit-image.sh names the very keys it scans for.
+COPY scripts/migrate.mjs scripts/seed.mjs ./scripts/
 
 USER node
 
