@@ -11,6 +11,7 @@ import {
 	type VestingTypeName
 } from '$lib/projects/validation';
 import { syncProjectMovements } from '$lib/server/koios';
+import { controlledSetFor } from '$lib/server/cardano';
 
 async function ownedProject(userId: string, id: string) {
 	const [row] = await db
@@ -189,8 +190,9 @@ export const actions: Actions = {
 			const { movements, transactionsScanned } = await syncProjectMovements({
 				network: owned.network,
 				unit: { policyId: owned.policyId, assetNameHex: owned.assetNameHex },
-				addresses: wallets.map((w) => w.address),
-				addressBucket: new Map(wallets.map((w) => [w.address, w.bucketId]))
+				controlled: controlledSetFor(
+					wallets.map((w) => ({ address: w.address, bucketId: w.bucketId }))
+				)
 			});
 
 			await db

@@ -1,4 +1,12 @@
-import { pgTable, text, integer, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+	pgTable,
+	text,
+	integer,
+	timestamp,
+	index,
+	uniqueIndex,
+	foreignKey
+} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { user } from '@cardano-mercury/core/db';
 
@@ -8,6 +16,13 @@ import { user } from '@cardano-mercury/core/db';
  * shared public schema, and they foreign-key to the shared `user` table owned by
  * mercury-core. Token amounts are decimal strings of integer base units (parsed
  * to bigint in the domain layer); timestamps are timestamptz. See docs/design.md.
+ *
+ * Every foreign key is named explicitly and kept well under 63 characters.
+ * Postgres truncates identifiers at 63, and drizzle's derived name
+ * (`{table}_{column}_{reftable}_{refcolumn}_fk`) exceeds that once the
+ * `tokenomics_` prefix is added, so the server would silently store a truncated
+ * name that never matches the one drizzle expects, and every diff would propose
+ * recreating the constraint.
  */
 
 const timestamps = {
@@ -24,9 +39,7 @@ export const project = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		ownerId: text('owner_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
+		ownerId: text('owner_id').notNull(),
 		name: text('name').notNull(),
 		slug: text('slug').notNull(),
 		network: text('network', { enum: ['mainnet', 'preprod', 'preview'] })
@@ -48,6 +61,11 @@ export const project = pgTable(
 		...timestamps
 	},
 	(t) => [
+		foreignKey({
+			columns: [t.ownerId],
+			foreignColumns: [user.id],
+			name: 'tokenomics_project_owner_fk'
+		}).onDelete('cascade'),
 		uniqueIndex('tokenomics_project_slug_unq').on(t.slug),
 		index('tokenomics_project_owner_idx').on(t.ownerId)
 	]
@@ -59,9 +77,7 @@ export const bucket = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		projectId: text('project_id')
-			.notNull()
-			.references(() => project.id, { onDelete: 'cascade' }),
+		projectId: text('project_id').notNull(),
 		name: text('name').notNull(),
 		// Allocation in base units, decimal string.
 		allocation: text('allocation').notNull().default('0'),
@@ -81,7 +97,14 @@ export const bucket = pgTable(
 		sortOrder: integer('sort_order').notNull().default(0),
 		...timestamps
 	},
-	(t) => [index('tokenomics_bucket_project_idx').on(t.projectId)]
+	(t) => [
+		foreignKey({
+			columns: [t.projectId],
+			foreignColumns: [project.id],
+			name: 'tokenomics_bucket_project_fk'
+		}).onDelete('cascade'),
+		index('tokenomics_bucket_project_idx').on(t.projectId)
+	]
 );
 
 export const controlledWallet = pgTable(
@@ -90,11 +113,9 @@ export const controlledWallet = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		projectId: text('project_id')
-			.notNull()
-			.references(() => project.id, { onDelete: 'cascade' }),
+		projectId: text('project_id').notNull(),
 		// Optional bucket assignment; cleared if the bucket is deleted.
-		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
+		bucketId: text('bucket_id'),
 		address: text('address').notNull(),
 		label: text('label'),
 		// JSON CIP-8 proof { signature, key } captured when ownership was proven.
@@ -103,6 +124,16 @@ export const controlledWallet = pgTable(
 		...timestamps
 	},
 	(t) => [
+		foreignKey({
+			columns: [t.projectId],
+			foreignColumns: [project.id],
+			name: 'tokenomics_wallet_project_fk'
+		}).onDelete('cascade'),
+		foreignKey({
+			columns: [t.bucketId],
+			foreignColumns: [bucket.id],
+			name: 'tokenomics_wallet_bucket_fk'
+		}).onDelete('set null'),
 		index('tokenomics_wallet_project_idx').on(t.projectId),
 		index('tokenomics_wallet_bucket_idx').on(t.bucketId),
 		uniqueIndex('tokenomics_wallet_project_address_unq').on(t.projectId, t.address)
@@ -115,10 +146,8 @@ export const transactionTag = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		projectId: text('project_id')
-			.notNull()
-			.references(() => project.id, { onDelete: 'cascade' }),
-		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
+		projectId: text('project_id').notNull(),
+		bucketId: text('bucket_id'),
 		txHash: text('tx_hash').notNull(),
 		outputIndex: integer('output_index'),
 		category: text('category').notNull(),
@@ -128,6 +157,16 @@ export const transactionTag = pgTable(
 		...timestamps
 	},
 	(t) => [
+		foreignKey({
+			columns: [t.projectId],
+			foreignColumns: [project.id],
+			name: 'tokenomics_tag_project_fk'
+		}).onDelete('cascade'),
+		foreignKey({
+			columns: [t.bucketId],
+			foreignColumns: [bucket.id],
+			name: 'tokenomics_tag_bucket_fk'
+		}).onDelete('set null'),
 		index('tokenomics_tag_project_idx').on(t.projectId),
 		index('tokenomics_tag_tx_idx').on(t.txHash)
 	]
@@ -139,9 +178,7 @@ export const anchorRecord = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		projectId: text('project_id')
-			.notNull()
-			.references(() => project.id, { onDelete: 'cascade' }),
+		projectId: text('project_id').notNull(),
 		version: integer('version').notNull(),
 		payloadHash: text('payload_hash').notNull(),
 		metadataLabel: integer('metadata_label').notNull(),
@@ -152,6 +189,11 @@ export const anchorRecord = pgTable(
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
+		foreignKey({
+			columns: [t.projectId],
+			foreignColumns: [project.id],
+			name: 'tokenomics_anchor_project_fk'
+		}).onDelete('cascade'),
 		index('tokenomics_anchor_project_idx').on(t.projectId),
 		uniqueIndex('tokenomics_anchor_project_version_unq').on(t.projectId, t.version)
 	]
@@ -163,10 +205,8 @@ export const tokenMovement = pgTable(
 		id: text('id')
 			.primaryKey()
 			.$defaultFn(() => crypto.randomUUID()),
-		projectId: text('project_id')
-			.notNull()
-			.references(() => project.id, { onDelete: 'cascade' }),
-		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
+		projectId: text('project_id').notNull(),
+		bucketId: text('bucket_id'),
 		txHash: text('tx_hash').notNull(),
 		// Net external direction relative to the controlled set.
 		direction: text('direction', { enum: ['out', 'in'] }).notNull(),
@@ -180,6 +220,16 @@ export const tokenMovement = pgTable(
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
+		foreignKey({
+			columns: [t.projectId],
+			foreignColumns: [project.id],
+			name: 'tokenomics_movement_project_fk'
+		}).onDelete('cascade'),
+		foreignKey({
+			columns: [t.bucketId],
+			foreignColumns: [bucket.id],
+			name: 'tokenomics_movement_bucket_fk'
+		}).onDelete('set null'),
 		index('tokenomics_movement_project_idx').on(t.projectId),
 		index('tokenomics_movement_bucket_idx').on(t.bucketId),
 		uniqueIndex('tokenomics_movement_project_tx_dir_unq').on(t.projectId, t.txHash, t.direction)

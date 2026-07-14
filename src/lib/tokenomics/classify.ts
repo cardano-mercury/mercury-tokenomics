@@ -1,4 +1,5 @@
 import type { Movement } from './compare';
+import type { ControlledSet } from './controlled';
 
 /**
  * A token transfer observed on chain, before any controlled-set classification.
@@ -32,17 +33,19 @@ export interface ClassifiedTransfers {
  *
  * Classification per transfer:
  * - controlled to outside: external outflow, attributed to the from address's
- *   bucket (falling back to `unassignedBucketId` when null or absent).
+ *   bucket (falling back to `unassignedBucketId` when the set cannot attribute it).
  * - controlled to controlled: internal, counted only.
  * - outside to controlled: inbound, counted only.
  * - outside to outside: ignored.
+ *
+ * Membership is the `ControlledSet`'s to decide, so an address that shares a
+ * declared wallet's stake key counts as ours and its moves stay internal.
  *
  * Transfers with amount <= 0n are ignored entirely.
  */
 export function classifyTransfers(
 	transfers: RawTransfer[],
-	controlled: ReadonlySet<string>,
-	addressBucket: ReadonlyMap<string, string | null>,
+	controlled: ControlledSet,
 	unassignedBucketId = 'unassigned'
 ): ClassifiedTransfers {
 	const external: Movement[] = [];
@@ -56,9 +59,8 @@ export function classifyTransfers(
 		const toControlled = controlled.has(transfer.toAddress);
 
 		if (fromControlled && !toControlled) {
-			const bucket = addressBucket.get(transfer.fromAddress);
 			external.push({
-				bucketId: bucket ?? unassignedBucketId,
+				bucketId: controlled.bucketOf(transfer.fromAddress) ?? unassignedBucketId,
 				at: transfer.at,
 				amount: transfer.amount
 			});

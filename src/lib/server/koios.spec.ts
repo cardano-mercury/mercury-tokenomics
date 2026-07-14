@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { makeControlledSet } from '$lib/tokenomics/controlled';
 import {
 	normalizeTx,
 	netMovementForTx,
@@ -59,11 +60,13 @@ describe('normalizeTx', () => {
 	});
 });
 
-const controlled = new Set(['ctrlA', 'ctrlB']);
-const addressBucket = new Map<string, string | null>([
-	['ctrlA', 'bucket-a'],
-	['ctrlB', null]
-]);
+const controlled = makeControlledSet(
+	[
+		{ address: 'ctrlA', bucketId: 'bucket-a' },
+		{ address: 'ctrlB', bucketId: null }
+	],
+	() => null
+);
 
 function tx(inputs: [string, bigint][], outputs: [string, bigint][]): NormalizedTx {
 	return {
@@ -76,7 +79,7 @@ function tx(inputs: [string, bigint][], outputs: [string, bigint][]): Normalized
 
 describe('netMovementForTx', () => {
 	it('reports a full external outflow attributed to the input bucket', () => {
-		const m = netMovementForTx(tx([['ctrlA', 100n]], [['ext', 100n]]), controlled, addressBucket);
+		const m = netMovementForTx(tx([['ctrlA', 100n]], [['ext', 100n]]), controlled);
 		expect(m).toMatchObject({
 			direction: 'out',
 			amount: 100n,
@@ -94,20 +97,17 @@ describe('netMovementForTx', () => {
 					['ext', 70n]
 				]
 			),
-			controlled,
-			addressBucket
+			controlled
 		);
 		expect(m).toMatchObject({ direction: 'out', amount: 70n });
 	});
 
 	it('returns null for a purely internal transaction', () => {
-		expect(
-			netMovementForTx(tx([['ctrlA', 100n]], [['ctrlB', 100n]]), controlled, addressBucket)
-		).toBeNull();
+		expect(netMovementForTx(tx([['ctrlA', 100n]], [['ctrlB', 100n]]), controlled)).toBeNull();
 	});
 
 	it('reports an inbound movement', () => {
-		const m = netMovementForTx(tx([['ext', 50n]], [['ctrlA', 50n]]), controlled, addressBucket);
+		const m = netMovementForTx(tx([['ext', 50n]], [['ctrlA', 50n]]), controlled);
 		expect(m).toMatchObject({ direction: 'in', amount: 50n, bucketId: 'bucket-a' });
 	});
 
@@ -120,14 +120,13 @@ describe('netMovementForTx', () => {
 				],
 				[['ext', 100n]]
 			),
-			controlled,
-			addressBucket
+			controlled
 		);
 		expect(m).toMatchObject({ direction: 'out', amount: 100n, bucketId: 'bucket-a' });
 	});
 
 	it('yields a null bucket when the contributing address has none', () => {
-		const m = netMovementForTx(tx([['ctrlB', 40n]], [['ext', 40n]]), controlled, addressBucket);
+		const m = netMovementForTx(tx([['ctrlB', 40n]], [['ext', 40n]]), controlled);
 		expect(m).toMatchObject({ direction: 'out', bucketId: null });
 	});
 });
@@ -139,7 +138,7 @@ describe('netMovements and toEngineMovements', () => {
 			tx([['ctrlA', 50n]], [['ctrlB', 50n]]), // internal, dropped
 			tx([['ext', 10n]], [['ctrlA', 10n]]) // inbound
 		];
-		const ms = netMovements(txs, controlled, addressBucket);
+		const ms = netMovements(txs, controlled);
 		expect(ms.map((m) => m.direction)).toEqual(['out', 'in']);
 
 		const engine = toEngineMovements(ms, 'unassigned');
@@ -149,7 +148,7 @@ describe('netMovements and toEngineMovements', () => {
 	});
 
 	it('falls back to the unassigned bucket id for null-bucket outflows', () => {
-		const ms = netMovements([tx([['ctrlB', 40n]], [['ext', 40n]])], controlled, addressBucket);
+		const ms = netMovements([tx([['ctrlB', 40n]], [['ext', 40n]])], controlled);
 		expect(toEngineMovements(ms, 'unassigned')[0].bucketId).toBe('unassigned');
 	});
 });

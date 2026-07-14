@@ -45,6 +45,10 @@ AnchorRecord: one row per on-chain anchoring. Stores the project, the canonical 
 
 A bucket's utilization is its net external outflow: policy tokens that left the bucket's controlled wallets to addresses outside the project's full controlled set. Transfers between the project's own wallets are internal and do not count, so rebalancing does not inflate the statement. The full controlled-address set is required to classify each movement, which is why wallet declaration is a prerequisite for an accurate statement.
 
+The controlled set is keyed by staking credential, not by literal address. A Cardano wallet rotates payment addresses while keeping one stake key, so an address is treated as the project's when it is declared or when it shares a declared address's stake key. Chain history is fetched by stake credential as well as by address, since address-scoped history never returns a transaction that touched only a rotated sibling.
+
+Attribution to a bucket is deliberately stricter than membership. Several buckets may sit behind one stake key (one wallet, a different payment address per bucket), so a sibling address is attributed to a bucket only when its stake key has exactly one bucket behind it. Otherwise the outflow is recorded as unassigned rather than guessed at, since guessing would silently merge distinct buckets.
+
 On top of the automatic computation, operators can tag transactions to explain or reclassify movements. Tags never silently override the on-chain numbers; they annotate them and can split a raw outflow into labeled categories for the statement.
 
 ## Vesting math

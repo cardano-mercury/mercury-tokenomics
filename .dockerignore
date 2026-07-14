@@ -1,0 +1,22 @@
+node_modules
+.git
+.svelte-kit
+build
+.output
+.vercel
+.netlify
+.wrangler
+
+# Secrets. Never bake an env file into an image.
+.env
+.env.*
+!.env.example
+
+# Internal working documents.
+.claude
+
+# Editors and OS noise
+.idea
+.vscode
+.DS_Store
+Thumbs.db

@@ -13,15 +13,6 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
-			// @cardano-mercury/core is linked via file: and resolves drizzle-orm from its own
-			// location, so without this the app and core would compile against two drizzle-orm
-			// type instances (incompatible PgColumn types). Aliasing the directory unifies the
-			// type resolution; it is merged into the generated tsconfig paths alongside $lib.
-			// (better-auth is not aliased here: its subpaths are package "exports", not real
-			// folders, so a directory alias breaks them. Runtime dedupe below covers it.)
-			alias: {
-				'drizzle-orm': 'node_modules/drizzle-orm'
-			},
 			typescript: {
 				config: (config) => ({
 					...config,
@@ -30,8 +21,6 @@ export default defineConfig({
 			}
 		})
 	],
-	// Force a single runtime instance of these shared packages across the app and core.
-	resolve: { dedupe: ['drizzle-orm', 'better-auth'] },
 	test: {
 		expect: { requireAssertions: true },
 		projects: [

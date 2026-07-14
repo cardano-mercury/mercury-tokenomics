@@ -4,6 +4,147 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-13
+
+### Fixed
+
+- Utilization no longer counts a project's own address rotation as delivered tokens. A Cardano wallet
+  rotates payment addresses while keeping one staking credential, so a project that declared
+  `addr1...abc` still spends from and receives to sibling addresses under the same stake key. Those
+  siblings were matched by literal string, so they read as outsiders, and moving tokens between a
+  project's own addresses was booked as an external outflow. An address is now controlled when it is
+  declared **or** when it shares a declared address's stake key (`ControlledSet`, using
+  `rewardAddressOf` from `@cardano-mercury/core/cardano`, which parses offline with no chain call).
+- The chain sync now queries Koios by stake credential (`/account_txs`) as well as by declared address
+  (`/address_txs`). Address-scoped history alone never returns a transaction that touched only a
+  sibling address, so classification could not see what it was never given. Addresses with no staking
+  part (enterprise, script) still go through the address-scoped path.
+
+### Notes
+
+- **Bucket attribution deliberately does not follow the stake key.** Several buckets may legitimately
+  sit behind one stake key (one wallet, a different payment address per bucket), so attributing a
+  sibling by stake key would clump those buckets together. A declared address always uses its own
+  bucket; an undeclared sibling resolves to a bucket only when its stake key has exactly one bucket
+  behind it, and is left unassigned otherwise rather than guessed at.
+- `@meshsdk/core` is now a declared dependency. It was already present as an auto-installed peer of
+  `@cardano-mercury/core` and already shipped in the runtime image, so this adds nothing to the image;
+  it just stops the app relying on a transitive package it never asked for.
+
+## [0.14.0] - 2026-07-13
+
+### Added
+
+- Continuous integration and image publishing (`.github/workflows/release.yml`, the repo's first
+  workflow). It runs the existing gate (lint, `check`, the test suite) and then pushes two images to
+  GHCR: `mercury-tokenomics` (the server) and `mercury-tokenomics-migrate` (migrations and the seed
+  script). A push to `main` publishes a rolling `main` tag, a `v*` tag publishes the semver plus
+  `latest`, and both get a `sha-<short>` tag so a deploy can be pinned to a commit. The demo host can
+  then pull instead of building, which is what let the VM shrink: a SvelteKit build wants several GB
+  of RAM and a dev toolchain that has no business on a production box.
+
+### Changed
+
+- The `migrate` image is built from the base image rather than from the build stage, so it carries
+  only the migration SQL, `scripts/`, and the two packages those scripts import, instead of the whole
+  dev toolchain and the app build. **608 MB down to 175 MB**, the largest single thing the demo host
+  pulls. It remains the seed image, and the runbook's seed command is unchanged.
+
+## [0.13.0] - 2026-07-13
+
+### Added
+
+- Real SMTP delivery for magic-link sign-in, via nodemailer. Setting `SMTP_URL` sends the link as
+  email; `MAIL_FROM` overrides the sender. The shared deploy stack in mercury-core sets `SMTP_URL`
+  (pointing at a mailpit sink in its local dry run) and expects tokenomics to send, so the previous
+  transport stub would have failed the magic-link path there. Verified end to end against a live
+  SMTP server: the mail is delivered, and following the link issues a session and signs the account
+  in. With `SMTP_URL` unset the behaviour is unchanged (console in development, option hidden in
+  production).
+
+## [0.12.0] - 2026-07-13
+
+### Changed
+
+- `@cardano-mercury/core` now comes from npm (`^0.2.1`) instead of a `file:../mercury-core` link, so
+  no sibling checkout is needed to build. The link gave core its own `node_modules`, which meant two
+  physical copies of `better-auth`/`@better-auth/core` and therefore two TypeScript identities for
+  the same types. With one hoisted copy, the workarounds that duplication forced are all deleted: the
+  `drizzle-orm` alias and `resolve.dedupe` in `vite.config.ts`, and the cast on the `svelteKitHandler`
+  call in `hooks.server.ts`.
+- The `Dockerfile` is now an ordinary single-context build (`docker build --target runner .`), rather
+  than needing the parent directory holding every Mercury repo as its context.
+
+### Fixed
+
+- `npm run build` no longer requires production secrets. SvelteKit's postbuild analyse step imports
+  every server module, so connecting the database and constructing Better Auth at module scope made
+  the build demand a live `DATABASE_URL` and a real `BETTER_AUTH_SECRET`. It failed in a Docker
+  build, where there is no `.env`, and passed locally only because one was sitting there. Both are
+  now constructed on first use behind a proxy, so the build needs no environment and a missing
+  variable surfaces on the first request that touches it, where it is actionable.
+
+## [0.11.0] - 2026-07-13
+
+### Added
+
+- Production `Dockerfile` with a `runner` target (the server) and a `migrate` target (a one-shot).
+  The build context is the parent directory holding every Mercury repo, because core is linked as
+  `file:../mercury-core` and npm cannot resolve a path outside the build context. Feeds the shared
+  deployment stack composed in mercury-core.
+- `/healthz` readiness endpoint that round-trips the database, so a container that cannot reach the
+  shared Postgres reports unhealthy rather than silently serving errors. The check is bounded by a
+  timeout, because a probe that hangs cannot be told apart from a slow one.
+- `npm run db:migrate:deploy` (`scripts/migrate.mjs`), applying migrations through drizzle-orm's
+  runtime migrator so the production image needs neither drizzle-kit nor the TypeScript schema.
+- `PROTOCOL_HEADER` and `HOST_HEADER` to `.env.example`. Behind a TLS-terminating proxy adapter-node
+  needs these, or it builds absolute URLs from the internal address and Better Auth rejects its own
+  callbacks as cross-origin.
+
+### Fixed
+
+- Silent schema drift on the shared database. Postgres truncates identifiers at 63 characters, and
+  drizzle's derived foreign key name for `tokenomics_controlled_wallet` came to 64, so the server
+  stored a truncated name that never matched the one drizzle expected and every diff proposed
+  recreating the constraint. All nine foreign keys are now named explicitly and kept short, and a
+  migration renames the existing constraints in place (a rename, so the constraint stays enforced
+  and no re-validation scan is needed).
+- A request no longer hangs when the database is unreachable: the postgres client now has a
+  `connect_timeout`, where before it retried indefinitely.
+
+### Removed
+
+- The `db:push` script. `tablesFilter` covers tables but not sequences, so `drizzle-kit push`
+  against the shared database proposes dropping another app's migration-journal sequence and would
+  destroy its migration history.
+
+### Changed
+
+- Magic-link sign-in is now offered only where the link can be delivered: in development (printed to
+  the server console) or once a mail transport is configured (`SMTP_URL`). With no transport in
+  production the option is hidden and the action refuses a direct POST, instead of reporting that a
+  link was sent when it was only written to the container's stdout. Email and password, and TOTP
+  two-factor, are unaffected.
+- Pinned `better-auth` to `~1.6.23` to match the exact version mercury-core pins. A version skew
+  across the shared auth layer produces type errors that read as unrelated structural mismatches.
+
+## [0.10.1] - 2026-07-13
+
+### Changed
+
+- Dropped the hand-rolled `PluginEndpoints` cast in `auth.ts`: core 0.1.0 makes `createAuth` generic
+  over its plugins, so `auth.api.enableTwoFactor` / `verifyTOTP` / `disableTwoFactor` /
+  `signInMagicLink` now infer directly without an `authApi` wrapper.
+- Added a `PORT` variable to `.env.example` (default suggestion 3001) so tokenomics can be co-hosted
+  on the same machine as mercury-financials without both binding adapter-node's default port 3000.
+
+### Fixed
+
+- `hooks.server.ts`: core 0.1.0's typed-plugins return value is not structurally assignable to what
+  `better-auth/svelte-kit`'s `svelteKitHandler` expects for its `auth` parameter (a literal-tuple vs.
+  plain-array mismatch on `$ERROR_CODES`). Added a narrow local cast to keep `npm run check` clean
+  until core's fix lands; tracked as a TRD in mercury-core.
+
 ## [0.10.0] - 2026-06-30
 
 ### Changed

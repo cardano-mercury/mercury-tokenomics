@@ -41,7 +41,9 @@ The home page introduces the tool and links to Get started (account creation) an
 
 The operator flow follows the requirements in the PRD.
 
-Create an account using email with a password, or sign in with a magic link. In local development the magic link is printed to the server console rather than emailed. Once signed in, you can enable TOTP two-factor authentication from the dashboard security page; it then applies at every sign-in. Accounts are shared across the Mercury apps, so the same login works on Mercury Financials as well.
+Create an account using email with a password. Once signed in, you can enable TOTP two-factor authentication from the dashboard security page; it then applies at every sign-in. Accounts are shared across the Mercury apps, so the same login works on Mercury Financials as well.
+
+Magic-link sign-in is also supported, but only where the link can actually be delivered. With a mail transport configured (`SMTP_URL`) the link is emailed. In local development without one it is printed to the server console. On a deployment with no transport at all the option is hidden, rather than offering a sign-in whose link goes nowhere.
 
 Create a project from the dashboard by providing its name, the token policy id, asset name, decimals, total supply, network, and the token generation date (T0) that anchors all schedules. You can edit these details at any time.
 

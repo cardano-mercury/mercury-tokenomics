@@ -1,5 +1,6 @@
 import type { Movement } from '$lib/tokenomics/compare';
 import type { Network } from '$lib/tokenomics/types';
+import type { ControlledSet } from '$lib/tokenomics/controlled';
 
 /**
  * Koios chain client. The pure parsing and netting functions are separated from
@@ -96,11 +97,7 @@ export function normalizeTx(tx: KoiosTx, unit: AssetUnit): NormalizedTx {
  * attribution uses the controlled address contributing the largest amount on
  * the relevant side.
  */
-export function netMovementForTx(
-	tx: NormalizedTx,
-	controlled: ReadonlySet<string>,
-	addressBucket: ReadonlyMap<string, string | null>
-): NetMovement | null {
+export function netMovementForTx(tx: NormalizedTx, controlled: ControlledSet): NetMovement | null {
 	const controlledInputs = tx.inputs.filter((io) => controlled.has(io.address));
 	const controlledOutputs = tx.outputs.filter((io) => controlled.has(io.address));
 	const sumIn = controlledInputs.reduce((s, io) => s + io.amount, 0n);
@@ -117,7 +114,7 @@ export function netMovementForTx(
 			at: tx.at,
 			direction: 'out',
 			amount: -delta,
-			bucketId: source ? (addressBucket.get(source.address) ?? null) : null,
+			bucketId: source ? controlled.bucketOf(source.address) : null,
 			counterparty: counterparty?.address ?? null
 		};
 	}
@@ -129,7 +126,7 @@ export function netMovementForTx(
 		at: tx.at,
 		direction: 'in',
 		amount: delta,
-		bucketId: dest ? (addressBucket.get(dest.address) ?? null) : null,
+		bucketId: dest ? controlled.bucketOf(dest.address) : null,
 		counterparty: counterparty?.address ?? null
 	};
 }
@@ -143,14 +140,10 @@ function largest(ios: NormalizedIO[]): NormalizedIO | null {
 }
 
 /** Net movements across many transactions, in input order. */
-export function netMovements(
-	txs: NormalizedTx[],
-	controlled: ReadonlySet<string>,
-	addressBucket: ReadonlyMap<string, string | null>
-): NetMovement[] {
+export function netMovements(txs: NormalizedTx[], controlled: ControlledSet): NetMovement[] {
 	const result: NetMovement[] = [];
 	for (const tx of txs) {
-		const m = netMovementForTx(tx, controlled, addressBucket);
+		const m = netMovementForTx(tx, controlled);
 		if (m) result.push(m);
 	}
 	return result;
@@ -176,12 +169,40 @@ async function koiosPost<T>(network: Network, path: string, body: unknown): Prom
 	return res.json() as Promise<T>;
 }
 
-/** Fetch all transaction hashes that touch the given addresses. */
-async function fetchAddressTxHashes(network: Network, addresses: string[]): Promise<string[]> {
-	const rows = await koiosPost<Array<{ tx_hash: string }>>(network, '/address_txs', {
-		_addresses: addresses
-	});
-	return [...new Set(rows.map((r) => r.tx_hash))];
+/**
+ * Transaction hashes touching the project's wallets.
+ *
+ * Queried by stake key where possible, not just by the declared addresses. `/address_txs` returns
+ * history for the exact strings given, so a transaction that only touched a sibling address (same
+ * stake key, rotated payment address) would never be fetched, and the classification fix in
+ * `ControlledSet` could not see what it was never given. `/account_txs` is scoped to the stake
+ * credential and returns history for every address under it.
+ *
+ * Addresses with no staking part (enterprise or script addresses) have no stake key to query, so
+ * they still go through `/address_txs`. Both sets are merged and deduplicated.
+ */
+async function fetchTxHashes(
+	network: Network,
+	addresses: string[],
+	stakeKeys: string[]
+): Promise<string[]> {
+	const hashes = new Set<string>();
+
+	for (const stakeAddress of stakeKeys) {
+		const rows = await koiosPost<Array<{ tx_hash: string }>>(network, '/account_txs', {
+			_stake_address: stakeAddress
+		});
+		for (const row of rows) hashes.add(row.tx_hash);
+	}
+
+	if (addresses.length > 0) {
+		const rows = await koiosPost<Array<{ tx_hash: string }>>(network, '/address_txs', {
+			_addresses: addresses
+		});
+		for (const row of rows) hashes.add(row.tx_hash);
+	}
+
+	return [...hashes];
 }
 
 /** Fetch full tx info (with inputs and outputs) for a batch of hashes. */
@@ -212,17 +233,16 @@ export interface SyncResult {
 export async function syncProjectMovements(opts: {
 	network: Network;
 	unit: AssetUnit;
-	addresses: string[];
-	addressBucket: ReadonlyMap<string, string | null>;
+	controlled: ControlledSet;
 }): Promise<SyncResult> {
-	if (opts.addresses.length === 0) return { movements: [], transactionsScanned: 0 };
+	const addresses = opts.controlled.addresses();
+	if (addresses.length === 0) return { movements: [], transactionsScanned: 0 };
 
-	const controlled = new Set(opts.addresses);
-	const hashes = await fetchAddressTxHashes(opts.network, opts.addresses);
+	const hashes = await fetchTxHashes(opts.network, addresses, opts.controlled.stakeKeys());
 	const txInfo = await fetchTxInfo(opts.network, hashes);
 	const normalized = txInfo.map((tx) => normalizeTx(tx, opts.unit));
 	return {
-		movements: netMovements(normalized, controlled, opts.addressBucket),
+		movements: netMovements(normalized, opts.controlled),
 		transactionsScanned: normalized.length
 	};
 }

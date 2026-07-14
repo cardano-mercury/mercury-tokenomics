@@ -7,46 +7,45 @@ import { db } from '$lib/server/db';
 import { sendMagicLinkEmail } from '$lib/server/email';
 
 /**
- * Better Auth for tokenomics, built from the shared mercury-core factory so the
- * email/password, two-factor, Postgres adapter, and cross-subdomain cookie
- * conventions match the other Mercury apps. Magic link and its email transport
- * stay app-side. Keep sveltekitCookies last.
+ * Better Auth for tokenomics, built from the shared mercury-core factory so the email/password,
+ * two-factor, Postgres adapter, and cross-subdomain cookie conventions match the other Mercury apps.
+ * Magic link and its email transport stay app-side. Keep sveltekitCookies last.
  */
-export const auth = createAuth({
-	db,
-	secret: env.BETTER_AUTH_SECRET,
-	baseURL: env.ORIGIN,
-	issuer: 'Mercury Tokenomics',
-	cookieDomain: env.COOKIE_DOMAIN || undefined,
-	plugins: [
-		magicLink({
-			sendMagicLink: async ({ email, url }) => {
-				await sendMagicLinkEmail(email, url);
-			}
-		}),
-		sveltekitCookies(getRequestEvent)
-	]
-});
-
-/**
- * Endpoints added by the two-factor and magic-link plugins. They are registered at runtime, but
- * core's `createAuth` widens `plugins` to `any[]`, so their types are not inferred onto `auth.api`.
- * This typed view restores them for the call sites that use them.
- */
-interface PluginEndpoints {
-	enableTwoFactor(ctx: {
-		body: { password: string; issuer?: string };
-		headers: Headers;
-	}): Promise<{ totpURI: string; backupCodes: string[] }>;
-	verifyTOTP(ctx: {
-		body: { code: string; trustDevice?: boolean };
-		headers?: Headers;
-	}): Promise<unknown>;
-	disableTwoFactor(ctx: { body: { password: string }; headers: Headers }): Promise<unknown>;
-	signInMagicLink(ctx: {
-		body: { email: string; callbackURL?: string };
-		headers: Headers;
-	}): Promise<unknown>;
+function build() {
+	return createAuth({
+		db,
+		secret: env.BETTER_AUTH_SECRET,
+		baseURL: env.ORIGIN,
+		issuer: 'Mercury Tokenomics',
+		cookieDomain: env.COOKIE_DOMAIN || undefined,
+		plugins: [
+			magicLink({
+				sendMagicLink: async ({ email, url }) => {
+					await sendMagicLinkEmail(email, url);
+				}
+			}),
+			sveltekitCookies(getRequestEvent)
+		]
+	});
 }
 
-export const authApi = auth.api as typeof auth.api & PluginEndpoints;
+type Auth = ReturnType<typeof build>;
+
+let instance: Auth | undefined;
+
+/**
+ * Built on first use rather than at import.
+ *
+ * SvelteKit's postbuild `analyse` step imports every server module, so constructing here at module
+ * scope would run during `npm run build`, where Better Auth throws without a real
+ * `BETTER_AUTH_SECRET`. That would make the build require production secrets, which fails in a
+ * Docker build, where there is no `.env` and there had better not be. The proxy keeps the exported
+ * type and every call site (`auth.api.*`, `svelteKitHandler({ auth })`) unchanged.
+ */
+export const auth: Auth = new Proxy({} as Auth, {
+	get(_target, prop) {
+		instance ??= build();
+		const value = Reflect.get(instance, prop);
+		return typeof value === 'function' ? value.bind(instance) : value;
+	}
+});
