@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/cardano-mercury/mercury-tokenomics/security/advisories/new
+    about: Report privately through a draft security advisory. Never in a public issue.

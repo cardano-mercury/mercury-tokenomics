@@ -1,0 +1,101 @@
+version: 2
+
+# Weekly, aged, grouped, and few.
+#
+# `cooldown` refuses to raise a pull request until a release has been out in the world for a while:
+# 14 days for a major, 7 for a minor. A brand-new release is the one most likely to be yanked or to
+# ship a regression, and there is no value in this project being the one that finds out. Patches move
+# faster, because a patch is usually the fix for exactly that.
+#
+# Grouping is by blast radius, so the review can match the risk: security fixes on their own, majors
+# on their own (they are the ones that actually break things), and routine minor and patch bumps
+# batched into one pull request per dependency type rather than thirty.
+#
+# A Dependabot pull request still has to satisfy this repository's own gate: CI requires a version
+# bump in package.json and a change fragment under `.changes/unreleased/`, and Dependabot writes
+# neither. Add them to its branch before merging.
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Keep the queue small enough that it actually gets reviewed.
+    open-pull-requests-limit: 3
+
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+
+    groups:
+      # Security fixes are the point of the exercise: their own pull request, so one is never buried
+      # in a routine batch.
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+
+      # Majors break things by definition. Never batched with anything else.
+      major-updates:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [major]
+
+      production-dependencies:
+        applies-to: version-updates
+        dependency-type: production
+        update-types: [minor, patch]
+
+      development-dependencies:
+        applies-to: version-updates
+        dependency-type: development
+        update-types: [minor, patch]
+
+    ignore:
+      # `better-auth` must be the exact version @cardano-mercury/core pins. If they differ, the app
+      # and core resolve two copies of its types and the build fails with a structural error that
+      # reads as entirely unrelated. It is bumped deliberately, across core and both Mercury apps at
+      # once, and never on a bot's schedule.
+      - dependency-name: better-auth
+      - dependency-name: '@cardano-mercury/core'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+      actions-major:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [major]
+      actions:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # The Dockerfile's base image (node:22-alpine).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+      base-image:
+        applies-to: version-updates
+        patterns: ['*']
