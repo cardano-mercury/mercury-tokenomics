@@ -86,4 +86,6 @@ Security problems go through private reporting, never a public issue. See `SECUR
 
 ## License
 
-Apache 2.0. See `LICENSE`.
+Apache License 2.0, Copyright 2026 Cardano Mercury, Inc. See `LICENSE`.
+
+Contributions are accepted under the same license, as set out in `CONTRIBUTING.md`.

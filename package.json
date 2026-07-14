@@ -1,7 +1,13 @@
 {
 	"name": "mercury-tokenomics",
 	"private": true,
-	"version": "0.15.0",
+	"license": "Apache-2.0",
+	"author": "Cardano Mercury, Inc.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/cardano-mercury/mercury-tokenomics.git"
+	},
+	"version": "0.16.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
