@@ -1,0 +1,88 @@
+name: Release
+
+# Publishes the two images the deploy stack pulls, so the demo host never builds from source (a
+# SvelteKit build wants several GB of RAM and a dev toolchain that has no business on a production
+# box):
+#
+#   ghcr.io/<owner>/mercury-tokenomics           the server        (Dockerfile target: runner)
+#   ghcr.io/<owner>/mercury-tokenomics-migrate   migrations + seed (Dockerfile target: migrate)
+#
+# Two images, not one: the runner installs production dependencies only, so it carries neither
+# drizzle-orm nor scripts/, and cannot migrate or seed itself. The stack runs the migrate image as a
+# one-shot before the app starts.
+#
+# Publishing is deliberately separate from CI. CI gates pull requests; this runs only on a version
+# tag, and reuses the CI workflow as its first job so a tag cannot ship an image that never passed
+# the gate.
+#
+# Releasing: bump `version` in package.json with a CHANGELOG entry (the project's existing
+# convention), merge, then tag that commit `v<version>` and push the tag.
+#
+# NOTE: GHCR packages are PRIVATE by default and do NOT inherit visibility from the repository, even
+# when the repository is public. Both packages must be set to public once, or every pull on the demo
+# host needs a token. The setting lives on the package. Making a package public is irreversible.
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The same gate pull requests run. A tag can be placed on any commit, so this is not redundant.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mercury-tokenomics
+            target: runner
+          - image: mercury-tokenomics-migrate
+            target: migrate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The built-in GITHUB_TOKEN is enough for GHCR, so there is no PAT to manage.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=sha,format=short
+
+      # The build context is the repo itself: core comes from npm, so nothing outside it is needed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
