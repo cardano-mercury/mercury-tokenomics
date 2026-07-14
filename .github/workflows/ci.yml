@@ -60,7 +60,9 @@ jobs:
       # svelte-check over the app and its types.
       - run: npm run check
 
-      - run: npm test
+      # Coverage thresholds are enforced, not aspirational. They sit at the level the suite reaches,
+      # so coverage cannot regress.
+      - run: npm run test:coverage
 
       # The production build must work with no environment at all. Server modules construct the
       # database client and Better Auth lazily for exactly this reason: SvelteKit's postbuild analyse
@@ -84,6 +86,8 @@ jobs:
           context: .
           target: runner
           push: false
+          load: true
+          tags: mercury-tokenomics:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -93,5 +97,13 @@ jobs:
           context: .
           target: migrate
           push: false
+          load: true
+          tags: mercury-tokenomics-migrate:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Audit the image rather than assume it is clean. .dockerignore is read from the build context
+      # root, and getting that wrong is how a sibling repo shipped a live key into an image, where it
+      # went unnoticed because the image worked *because* the secret was in it.
+      - name: Audit images for secrets
+        run: scripts/audit-image.sh mercury-tokenomics:ci mercury-tokenomics-migrate:ci

@@ -34,14 +34,33 @@ permissions:
   contents: read
 
 jobs:
-  # The same gate pull requests run. A tag can be placed on any commit, so this is not redundant.
+  # A tag can be placed on any commit, including one whose package.json says something else. Publishing
+  # ghcr.io/...:0.17.0 from a tree that calls itself 0.16.1 is the kind of thing nobody notices until a
+  # deploy pulls the wrong code, so refuse before anything is built.
+  tag:
+    name: Tag matches version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the tag with package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "Tag $GITHUB_REF_NAME says $tag, package.json says $pkg. Refusing to publish."
+            exit 1
+          fi
+          echo "Tag and package.json agree on $pkg."
+
+  # The same gate pull requests run.
   verify:
     name: Verify
     uses: ./.github/workflows/ci.yml
 
   publish:
     name: Publish ${{ matrix.image }}
-    needs: verify
+    needs: [tag, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read

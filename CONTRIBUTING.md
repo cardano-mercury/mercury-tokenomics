@@ -47,20 +47,29 @@ CI and not on your machine.
   variable, a public module), update the docs in the same commit. End-user instructions live in
   `docs/usage.md`, the technical design in `docs/design.md`, developer setup in `README.md`.
   Documentation drift is treated as an incomplete change.
-- **A version bump.** Semantic Versioning. While the project is below 1.0, a feature bumps the minor
-  and a fix bumps the patch. CI rejects a pull request whose version is not above `main`'s.
-- **A change fragment**, not an edit to `CHANGELOG.md`. Add one file under `.changes/unreleased/`:
+- **A change fragment.** One new file under `.changes/unreleased/`, declaring what kind of change it
+  is and what it does to the version:
 
   ```markdown
   ---
   type: Fixed
+  bump: patch
   ---
 
   Vesting no longer rounds a bucket's final month down to zero.
   ```
 
-  One file per change, so open pull requests never conflict over the changelog. `.changes/README.md`
-  explains it. The fragments are folded into `CHANGELOG.md` at release time.
+  One file per change, so open pull requests never conflict over the changelog. A change that ships
+  nothing a user sees still says so, in a fragment. `.changes/README.md` has the details.
+
+- **Do not touch `package.json`'s version, and do not touch `CHANGELOG.md`.** Both are **outputs of a
+  release**, not inputs to a pull request. CI rejects a pull request that edits either. `npm run
+release` consumes the accumulated fragments, computes the version from the highest `bump:` among
+  them, and writes the changelog.
+
+  Choose the bump from **what a consumer experiences**, never from how much work it was. A fix is a
+  `patch`. A backwards-compatible addition is a `minor`. A breaking change is a `major`, and below 1.0
+  a `major` raises the minor number, which is how `0.x` says "this breaks you".
 
 ## Style
 

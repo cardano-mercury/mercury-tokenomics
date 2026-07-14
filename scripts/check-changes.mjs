@@ -1,46 +1,35 @@
 /**
  * The pull request gate for versioning and the changelog.
  *
- * Two rules, both enforced rather than left to convention:
+ * The version and the changelog are **outputs of a release, not inputs to a pull request**. A normal
+ * pull request declares its semver impact in a change fragment and touches neither; the release step
+ * (`npm run release`) consumes the fragments, computes the version from them, and writes the
+ * changelog. Hand-editing either is how two pull requests end up claiming the same version, or how a
+ * change ships with no entry at all.
  *
- * 1. The version in package.json must be higher than the base branch's. The release workflow tags
- *    `v<version>`, so merging without a bump means a tag that already exists.
- * 2. The change must be described. Descriptions are accumulated as one file per change under
- *    `.changes/unreleased/`, NOT by editing CHANGELOG.md directly: every pull request editing the
- *    same region of one file is a standing merge conflict, and the conflict is resolved by hand at
- *    exactly the moment nobody is paying attention to it. A new file per change never conflicts.
- *    `scripts/compile-changelog.mjs` folds them into CHANGELOG.md at release time.
+ * So this checks, for a normal pull request:
  *
- * A release pull request (one that compiles the fragments away) satisfies rule 2 by adding the
- * version's section to CHANGELOG.md instead, so it is accepted either way.
+ * - at least one new fragment under `.changes/unreleased/`, with a valid type and bump
+ * - `package.json`'s version is untouched
+ * - `CHANGELOG.md` is untouched
+ *
+ * The release pull request is the one thing that is supposed to do all three of those, so it is
+ * detected (it removes fragments) and checked against the opposite rules instead: the version must be
+ * exactly what the consumed fragments imply, and the changelog must carry that version's section.
+ * Note it is detected rather than skipped: a skipped job reports no status, and a required check that
+ * never reports blocks a pull request forever.
  *
  * Usage: node scripts/check-changes.mjs [baseRef]
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { DIR, parseFragment, highestBump, nextVersion } from './lib/changes.mjs';
 
 const baseRef = process.argv[2] ?? 'origin/main';
 
-/** Parse a semver core into comparable numbers. Pre-release and build metadata are not compared. */
-function parse(version) {
-	const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
-	if (!match) throw new Error(`Not a semver version: ${version}`);
-	return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-/** Positive when a is above b, negative when below, zero when equal. */
-function compare(a, b) {
-	const left = parse(a);
-	const right = parse(b);
-	for (let i = 0; i < 3; i++) {
-		if (left[i] !== right[i]) return left[i] - right[i];
-	}
-	return 0;
-}
-
 function git(args) {
-	// stderr is piped rather than inherited: a missing path on the base ref is an expected outcome
-	// here (the first release), not something to print a git error about.
+	// stderr is piped: a path missing on the base ref is an expected outcome here (the first
+	// release), not something to print a git error about.
 	return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
@@ -49,68 +38,132 @@ function fail(message) {
 	process.exit(1);
 }
 
-const head = JSON.parse(readFileSync('package.json', 'utf8')).version;
-
-// The base may predate package.json entirely (an empty or docs-only main). That is the first
-// release, and there is nothing to compare against.
-let base = null;
-try {
-	base = JSON.parse(git(['show', `${baseRef}:package.json`])).version;
-} catch {
-	console.log(`No package.json on ${baseRef}: treating ${head} as the first release.`);
-}
-
-if (base !== null) {
-	if (compare(head, base) === 0) {
-		fail(
-			`The version is still ${head}, the same as ${baseRef}.\n\n` +
-				`Bump "version" in package.json. While below 1.0 that is the minor for a feature and\n` +
-				`the patch for a fix. If someone else's bump landed first, rebase and bump again from\n` +
-				`the new base.`
-		);
-	}
-
-	if (compare(head, base) < 0) {
-		fail(`The version went backwards: ${base} on ${baseRef}, ${head} here.`);
+function fileOnBase(path) {
+	try {
+		return git(['show', `${baseRef}:${path}`]);
+	} catch {
+		return null;
 	}
 }
 
-// Rule 2: either a new change fragment, or (for a release PR) the version's changelog section.
-//
-// Diffed against the base ref itself, not gated on whether package.json existed there: the ref is
-// present either way, and gating on the file meant a first release saw no changed files at all and
-// so could never find its own fragments.
-let changedFiles = [];
+const headVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
+
+const basePackage = fileOnBase('package.json');
+const baseVersion = basePackage ? JSON.parse(basePackage).version : null;
+
+let changed = [];
 try {
-	changedFiles = git(['diff', '--name-only', `${baseRef}...HEAD`])
+	changed = git(['diff', '--name-status', `${baseRef}...HEAD`])
 		.split('\n')
-		.filter(Boolean);
+		.filter(Boolean)
+		.map((line) => {
+			const [status, ...rest] = line.split('\t');
+			return { status: status[0], path: rest[rest.length - 1] };
+		});
 } catch {
 	fail(`Could not diff against ${baseRef}. The checkout needs full history (fetch-depth: 0).`);
 }
 
-const addedFragments = changedFiles.filter(
-	(f) => f.startsWith('.changes/unreleased/') && f.endsWith('.md')
-);
+const fragmentsIn = (statuses) =>
+	changed.filter(
+		(c) => statuses.includes(c.status) && c.path.startsWith(`${DIR}/`) && c.path.endsWith('.md')
+	);
 
-const changelogHasVersion = readFileSync('CHANGELOG.md', 'utf8').includes(`## [${head}]`);
+const added = fragmentsIn(['A']);
+const removed = fragmentsIn(['D']);
 
-if (addedFragments.length === 0 && !changelogHasVersion) {
+const touched = (path) => changed.some((c) => c.path === path);
+const versionChanged = baseVersion !== null && baseVersion !== headVersion;
+
+const changelog = readFileSync('CHANGELOG.md', 'utf8');
+const changelogHasHeadVersion = changelog.includes(`## [${headVersion}]`);
+
+// A release pull request consumes fragments, so it is normally the one that removes them.
+//
+// The second clause covers the case where a branch both adds and consumes its fragments, so the net
+// diff against the base shows no fragment files at all and the first clause cannot see them. That is
+// what the initial import looks like: a branch carrying the whole history onto an empty main. It is
+// still checked as a release, not waved through, since the rules below apply either way.
+const isRelease =
+	removed.length > 0 ||
+	(changelogHasHeadVersion && touched('CHANGELOG.md') && (baseVersion === null || versionChanged));
+
+if (isRelease) {
+	// Recreate the fragments it consumed, and confirm the version it claims is the one they imply.
+	const consumed = removed.map((c) => {
+		const raw = fileOnBase(c.path);
+		if (raw === null) fail(`${c.path} was removed but is not on ${baseRef}. Rebase.`);
+		return parseFragment(c.path, raw);
+	});
+
+	// The base may predate package.json entirely (the first release onto an empty main), in which case
+	// there is no version to compute the next one from and only the changelog can be checked.
+	if (baseVersion !== null) {
+		const expected = nextVersion(baseVersion, highestBump(consumed));
+
+		if (headVersion !== expected) {
+			fail(
+				`This is a release pull request: it consumes ${consumed.length} fragment(s), whose highest\n` +
+					`bump is "${highestBump(consumed)}". From ${baseVersion} that means ${expected}, but\n` +
+					`package.json says ${headVersion}.\n\n` +
+					`Do not hand-edit the version. Run: npm run release`
+			);
+		}
+	}
+
+	if (!changelogHasHeadVersion) {
+		fail(`CHANGELOG.md has no "## [${headVersion}]" section. Run: npm run release`);
+	}
+
+	console.log(
+		`Release pull request: ${baseVersion} -> ${headVersion}, ${consumed.length} fragment(s) consumed. OK.`
+	);
+	process.exit(0);
+}
+
+// A normal pull request.
+if (added.length === 0) {
 	fail(
-		`No change description found.\n\n` +
-			`Add a file under .changes/unreleased/ describing this change, for example\n` +
-			`.changes/unreleased/fix-vesting-rounding.md:\n\n` +
+		`No change fragment.\n\n` +
+			`Describe this change in a new file under ${DIR}/, for example\n` +
+			`${DIR}/fix-vesting-rounding.md:\n\n` +
 			`    ---\n` +
 			`    type: Fixed\n` +
+			`    bump: patch\n` +
 			`    ---\n\n` +
 			`    Vesting no longer rounds a bucket's final month down to zero.\n\n` +
-			`One file per change, so pull requests never conflict over CHANGELOG.md.\n` +
-			`Valid types: Added, Changed, Deprecated, Removed, Fixed, Security.`
+			`One file per change, so pull requests never conflict over the changelog.\n` +
+			`A change that ships nothing user-visible still says so, in a fragment.`
 	);
 }
 
-const described = addedFragments.length
-	? `${addedFragments.length} change fragment(s)`
-	: `a CHANGELOG.md section`;
+// Validate each one, so a malformed fragment fails here and not at release time.
+for (const { path } of added) {
+	try {
+		parseFragment(path, readFileSync(path, 'utf8'));
+	} catch (error) {
+		fail(error.message);
+	}
+}
 
-console.log(`Version ${base ?? '(none)'} -> ${head}, described by ${described}. OK.`);
+if (versionChanged) {
+	fail(
+		`package.json's version was changed by hand (${baseVersion} -> ${headVersion}).\n\n` +
+			`The version is an output of a release, not an input to a pull request. Declare the impact\n` +
+			`with "bump:" in your change fragment instead, and leave the version alone. The release\n` +
+			`computes it from the fragments it consumes.`
+	);
+}
+
+if (touched('CHANGELOG.md')) {
+	fail(
+		`CHANGELOG.md was edited by hand.\n\n` +
+			`The changelog is written by the release from the accumulated fragments. Editing it in a\n` +
+			`pull request is what makes every open pull request conflict with every other one.`
+	);
+}
+
+const bumps = added.map((c) => parseFragment(c.path, readFileSync(c.path, 'utf8')).bump);
+console.log(
+	`${added.length} change fragment(s), highest bump "${highestBump(bumps.map((bump) => ({ bump })))}". Version untouched. OK.`
+);

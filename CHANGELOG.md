@@ -4,6 +4,60 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-14
+
+### Added
+
+- Continuous integration, split from publishing. `ci.yml` is the quality gate: it runs on every pull
+  request and on pushes to `main`, checks lint, types, tests and a no-environment production build, and
+  builds both container images without pushing them, so a broken Dockerfile fails the pull request
+  rather than the release. `release.yml` runs only on a `v*` tag and publishes the images to GHCR; it
+  reuses the CI workflow as its first job, so a tag cannot ship an image that never passed the gate.
+- Enforced coverage thresholds (`npm run test:coverage`, run in CI). They sit at the level the suite
+  currently reaches, so coverage cannot regress. The denominator is the logic-bearing modules; the
+  drizzle schema, barrels, type files, configuration and thin re-export seams are excluded, since a
+  percentage over those measures nothing.
+- An `.editorconfig`, matching `.prettierrc` exactly, and an explicit `tabWidth` in the Prettier config.
+  Prettier reads `.editorconfig` and maps `indent_size` onto `tabWidth`, so the two silently fight when
+  they disagree: an editor or agent that has not loaded Prettier indents one way and Prettier reformats
+  the other way on every save. Verified that adding it reformats zero files.
+- Community health files for public contribution: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor
+  Covenant 2.1), `SECURITY.md` with private vulnerability reporting and an explicit scope, `CODEOWNERS`,
+  issue and pull request templates, and a Dependabot configuration that deliberately excludes
+  `better-auth` and `@cardano-mercury/core`, which must be bumped in lockstep across the Mercury apps.
+
+  Dependabot runs weekly with a cooldown so a release must be 14 days old (major) or 7 days old (minor)
+  before it is proposed, a low cap on open pull requests, and groups by blast radius: security fixes
+  alone, majors alone, and routine minor and patch bumps batched per dependency type.
+
+- Two guards on what gets published. The release workflow refuses to publish when the git tag and
+  `package.json` disagree, so a tag on the wrong commit cannot ship an image labelled with a version the
+  code does not claim. CI audits both images for secrets rather than assuming they are clean: it counts
+  matches instead of piping `grep` into `head` (which succeeds whatever it found), and it matches
+  sensitive keys rather than every long-looking value, so it does not cry wolf over a dependency's
+  README. Verified against a deliberately poisoned image.
+- A pull request gate for versioning and the changelog. Every pull request must describe itself with one
+  new file under `.changes/unreleased/`, carrying a Keep a Changelog type and the semver impact. One
+  file per change, so open pull requests never conflict over `CHANGELOG.md`.
+
+### Changed
+
+- The Apache 2.0 license now carries its copyright attribution (Copyright 2026 Cardano Mercury, Inc.)
+  rather than the unfilled `[yyyy] [name of copyright owner]` placeholder, and `package.json` declares
+  the license, the author, and the repository.
+- The version and the changelog are now outputs of a release rather than inputs to a pull request. A
+  pull request declares its semver impact with `bump:` in its change fragment and touches neither;
+  `npm run release` consumes the fragments, computes the version from the highest bump among them, and
+  writes the changelog. CI rejects a hand-edited version or changelog, and exempts the release pull
+  request, which is the one thing that is supposed to do all three. Below 1.0 a breaking change raises
+  the minor, which is how `0.x` says "this breaks you".
+
+### Fixed
+
+- The version and changelog gate no longer skips its own change-fragment check when the base branch has
+  no `package.json` (a first release). It gated the diff on the file existing, so a first release saw no
+  changed files at all and could never find its own fragments.
+
 ## [0.15.0] - 2026-07-13
 
 ### Fixed
