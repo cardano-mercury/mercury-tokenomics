@@ -65,10 +65,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    # Only `default-days` here: Dependabot rejects the semver-graded keys for this ecosystem, because
+    # an action tag is not semver to it. And a rejected config is rejected WHOLE, so one unsupported
+    # key here silently disables the npm cooldowns above as well.
     cooldown:
       default-days: 7
-      semver-major-days: 14
-      semver-minor-days: 7
     groups:
       security:
         applies-to: security-updates
@@ -88,10 +89,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    # As above: semver-graded cooldowns are not supported for docker.
     cooldown:
       default-days: 7
-      semver-major-days: 14
-      semver-minor-days: 7
     groups:
       security:
         applies-to: security-updates

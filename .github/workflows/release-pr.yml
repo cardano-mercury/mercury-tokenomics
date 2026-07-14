@@ -39,9 +39,12 @@ jobs:
   open:
     name: Open or update the release PR
     runs-on: ubuntu-latest
+    # `branches: [development]` matches the CI run's HEAD branch, not its base, so a pull request whose
+    # head is development would also match. Only a push to development means "development moved".
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     steps:
       # Skipped when the App is not configured, so the workflow still assembles the release. Its pull
       # request just will not have working checks, and the body below says so rather than leaving the
