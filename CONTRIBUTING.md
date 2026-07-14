@@ -76,8 +76,6 @@ CI and not on your machine.
 - Prettier and ESLint decide formatting; do not argue with them.
 - Comments state what a function does and why it exists. No changelog-style comments ("previously
   this did X"), no exposition. Git history is the record of how code evolved.
-- In documentation: no em dashes, no arrow characters, no horizontal rules, and do not number section
-  headings (it breaks links when the order changes).
 
 ## Branches and pull requests
 

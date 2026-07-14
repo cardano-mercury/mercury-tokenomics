@@ -9,7 +9,7 @@
  *
  * So this checks, for a normal pull request:
  *
- * - at least one new fragment under `.changes/unreleased/`, with a valid type and bump
+ * - a fragment under `.changes/unreleased/`, either newly added or a revision to a still-pending one
  * - `package.json`'s version is untouched
  * - `CHANGELOG.md` is untouched
  *
@@ -69,7 +69,10 @@ const fragmentsIn = (statuses) =>
 		(c) => statuses.includes(c.status) && c.path.startsWith(`${DIR}/`) && c.path.endsWith('.md')
 	);
 
-const added = fragmentsIn(['A']);
+// A pull request describes itself by adding a fragment, or by revising one that is still pending: a
+// pending fragment has not been released yet, so correcting its wording or bump is a legitimate change
+// and should satisfy the gate on its own.
+const described = fragmentsIn(['A', 'M']);
 const removed = fragmentsIn(['D']);
 
 const touched = (path) => changed.some((c) => c.path === path);
@@ -122,7 +125,7 @@ if (isRelease) {
 }
 
 // A normal pull request.
-if (added.length === 0) {
+if (described.length === 0) {
 	fail(
 		`No change fragment.\n\n` +
 			`Describe this change in a new file under ${DIR}/, for example\n` +
@@ -138,7 +141,7 @@ if (added.length === 0) {
 }
 
 // Validate each one, so a malformed fragment fails here and not at release time.
-for (const { path } of added) {
+for (const { path } of described) {
 	try {
 		parseFragment(path, readFileSync(path, 'utf8'));
 	} catch (error) {
@@ -163,7 +166,7 @@ if (touched('CHANGELOG.md')) {
 	);
 }
 
-const bumps = added.map((c) => parseFragment(c.path, readFileSync(c.path, 'utf8')).bump);
+const bumps = described.map((c) => parseFragment(c.path, readFileSync(c.path, 'utf8')).bump);
 console.log(
-	`${added.length} change fragment(s), highest bump "${highestBump(bumps.map((bump) => ({ bump })))}". Version untouched. OK.`
+	`${described.length} change fragment(s), highest bump "${highestBump(bumps.map((bump) => ({ bump })))}". Version untouched. OK.`
 );
