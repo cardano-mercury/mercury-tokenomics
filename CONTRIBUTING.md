@@ -63,9 +63,9 @@ CI and not on your machine.
   nothing a user sees still says so, in a fragment. `.changes/README.md` has the details.
 
 - **Do not touch `package.json`'s version, and do not touch `CHANGELOG.md`.** Both are **outputs of a
-  release**, not inputs to a pull request. CI rejects a pull request that edits either. `npm run
-release` consumes the accumulated fragments, computes the version from the highest `bump:` among
-  them, and writes the changelog.
+  release**, not inputs to a pull request. CI rejects a pull request that edits either. The release
+  step consumes the accumulated fragments, computes the version from the highest `bump:` among them,
+  and writes the changelog.
 
   Choose the bump from **what a consumer experiences**, never from how much work it was. A fix is a
   `patch`. A backwards-compatible addition is a `minor`. A breaking change is a `major`, and below 1.0
@@ -79,13 +79,24 @@ release` consumes the accumulated fragments, computes the version from the highe
 - In documentation: no em dashes, no arrow characters, no horizontal rules, and do not number section
   headings (it breaks links when the order changes).
 
-## Pull requests
+## Branches and pull requests
 
-Branch off `main`, open a pull request against `main`. `main` is protected: it takes no direct
-pushes, and a pull request needs a green CI run and a review before it can merge.
+`main` is what has been released. Nothing lands on it except a release.
+
+Work accumulates on `development`. Branch off it, open your pull request against it, and it merges
+once CI is green. When it is time to release, `npm run release` turns the accumulated fragments into a
+version and a changelog entry, and that goes to `main` as an ordinary pull request running the same
+CI. So no bot and no maintainer ever needs to push past the gate.
+
+Both branches are protected: no direct pushes, no force pushes, and the checks must pass. That applies
+to administrators too. If an administrator can push past CI, CI is a suggestion.
 
 Keep a pull request to one coherent change. If you are fixing a bug and tidying the surrounding code,
-those are two pull requests, or at least two commits with honest messages.
+those are two pull requests, or at least two commits with honest messages. A pull request that also
+happens to reformat forty files cannot be reviewed.
+
+Say in the pull request **what you exercised and what it showed**. If you drove the flow, say so. If
+you only ran the tests, say that instead. That is the part a reviewer cannot reconstruct.
 
 ## Reporting things
 

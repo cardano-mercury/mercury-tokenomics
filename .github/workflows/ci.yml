@@ -1,16 +1,20 @@
 name: CI
 
-# The quality gate. Runs on every pull request and on pushes to main, and is what branch protection
-# requires before a PR can merge. It publishes nothing.
+# The quality gate. Runs on every pull request and push to `main` and `development`, and is what
+# branch protection on both requires before anything merges. It publishes nothing.
+#
+# It runs on `development` too, and not only on `main`: the fragments accumulate on `development`, so
+# a check that only guards `main` lets a pull request land there with no fragment, and the release
+# assembled from that branch silently misses it.
 #
 # `workflow_call` lets the release workflow reuse this exact gate, so a tag cannot publish an image
 # that was never checked, and the checks are defined in one place rather than duplicated.
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, development]
   push:
-    branches: [main]
+    branches: [main, development]
   workflow_call:
 
 # A newer commit on a branch supersedes in-flight runs for that branch or PR.
