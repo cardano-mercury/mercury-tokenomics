@@ -79,6 +79,20 @@ CI and not on your machine.
 - In documentation: no em dashes, no arrow characters, no horizontal rules, and do not number section
   headings (it breaks links when the order changes).
 
+### Commit messages, pull requests, and changelog entries
+
+These are a permanent public record of this repository. They say **what changed here and why**, in
+plain businesslike prose, and nothing else.
+
+- Do not reply to, argue with, or comment on other repositories. Mention another package only when it
+  is part of the change itself, factually and briefly: "bring our dependencies into alignment with
+  core" is fine, a critique of core's reasoning is not.
+- Do not cite internal working documents. A reader of the repository cannot see them.
+- Do not narrate how the work was produced. Say what it is and what you verified.
+
+Verification results belong in the text, because they are the part a reviewer cannot reconstruct.
+Editorial and process do not.
+
 ## Branches and pull requests
 
 `main` is what has been released. Nothing lands on it except a release.

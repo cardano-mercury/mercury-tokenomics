@@ -4,14 +4,14 @@ bump: patch
 ---
 
 Pinned five vulnerable transitive dependencies with npm `overrides`, taking `npm audit` from
-twenty-one advisories (one **high**) to **zero**. The high was `undici@5.29.0`, pulled in by
-`@meshsdk/core`, which is a peer dependency of `@cardano-mercury/core` and therefore installed in this
-tree rather than core's. npm honours `overrides` only from the root project, so core pinning it
-protects core and does nothing for us.
+twenty-one advisories, one of them high, to zero. The high was `undici@5.29.0`, reached through
+`@meshsdk/core`.
 
-There is no upgrade path: `@meshsdk/core` and `drizzle-kit` are both already on their latest release,
-and `npm audit fix` proposes _downgrading_ them, which is worse than the problem.
+There is no upgrade path out of it: `@meshsdk/core` and `drizzle-kit` are both already on their latest
+release, and `npm audit fix` offers to downgrade them instead. The pinned packages are `undici`,
+`ip-address` and `esbuild`, plus `cookie` (reached through SvelteKit) and `uuid` (through exceljs).
 
-Beyond the three that core asked for (`undici`, `ip-address`, `esbuild`), two more were needed for a
-clean audit, because they come from packages core does not have: `cookie` (via SvelteKit) and `uuid`
-(via exceljs).
+Each override was exercised against the code that depends on it: address parsing under `undici` 6
+returns identical results, the auth session still round-trips under `cookie` 0.7, the xlsx export still
+produces a valid workbook under `uuid` 11, and `drizzle-kit` still reads the schema under `esbuild`
+0.25.
