@@ -1,0 +1,79 @@
+name: Sync development
+
+# After a release merges to main, development still holds the fragments the release consumed and the
+# version it superseded. Left alone, the next release assembles those same fragments a second time and
+# computes its version from a stale package.json.
+#
+# The release cannot simply be pushed to development: development is protected, and no bot here gets
+# permission to bypass that. So the sync arrives the same way everything else does, as a pull request
+# that runs the same CI.
+#
+# Merging the release pull request with a merge commit (the repository allows no other kind) makes
+# development an ancestor of main, so this pull request is exactly the release commit and nothing else.
+#
+# The change gate recognises it: it removes fragments, moves the version, and writes the changelog,
+# which is the shape of a release, so it is checked against the release rules rather than being asked
+# for a fragment it cannot have.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-development
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Open the sync pull request
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - name: Is development behind?
+        id: behind
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin development
+          # Commits on main that development does not have. Zero means there is nothing to sync, which
+          # is the normal case for any push to main that is not a release.
+          count="$(git rev-list --count origin/development..origin/main)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "::notice::development is up to date with main. Nothing to sync."
+          fi
+
+      - name: Open or update the pull request
+        if: steps.behind.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+
+          body="$(printf 'Brings the release back to \140development\140: the version bump, the assembled changelog, and the removal of the fragments it consumed.\n\n**Merge this.** Until it lands, \140development\140 still carries the fragments that v%s already shipped, so the next release would assemble them a second time and compute its version from a superseded \140package.json\140.\n\nOpened automatically after a release merged to \140main\140.\n' "$version")"
+
+          existing="$(gh pr list --base development --head main --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "Sync development after v$version" --body "$body"
+            echo "updated PR #$existing"
+          else
+            gh pr create --base development --head main \
+              --title "Sync development after v$version" --body "$body"
+            echo "opened the sync pull request"
+          fi

@@ -1,0 +1,158 @@
+name: Release
+
+# Publishes the two images the deploy stack pulls, so the demo host never builds from source (a
+# SvelteKit build wants several GB of RAM and a dev toolchain that has no business on a production
+# box):
+#
+#   ghcr.io/<owner>/mercury-tokenomics           the server        (Dockerfile target: runner)
+#   ghcr.io/<owner>/mercury-tokenomics-migrate   migrations + seed (Dockerfile target: migrate)
+#
+# Two images, not one: the runner installs production dependencies only, so it carries neither
+# drizzle-orm nor scripts/, and cannot migrate or seed itself. The stack runs the migrate image as a
+# one-shot before the app starts.
+#
+# Triggered by CI *succeeding on main*, not by the push itself, so an image can only be built from a
+# commit whose gate went green. It then publishes only if package.json carries a version that has not
+# been released before, which makes "publish only when the version was stepped" a fact rather than a
+# convention: merge something that forgot to bump and it stops at the guard. The change gate refuses
+# such a pull request into main in the first place; this is the backstop.
+#
+# NOTE: GHCR packages are PRIVATE by default and do NOT inherit visibility from the repository, even
+# when the repository is public. Both packages must be set to public once, or every pull on the demo
+# host needs a token. The setting lives on the package. Making a package public is irreversible.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Is this version unreleased?
+    runs-on: ubuntu-latest
+    # A failed or cancelled CI run must not publish. workflow_dispatch has no run to inspect.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$version is already tagged. Nothing to publish."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "v$version has not been released. Publishing."
+          fi
+
+  publish:
+    name: Push ${{ matrix.image }}
+    needs: guard
+    if: needs.guard.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mercury-tokenomics
+            target: runner
+          - image: mercury-tokenomics-migrate
+            target: migrate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The built-in GITHUB_TOKEN is enough for GHCR, so there is no PAT to manage.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ needs.guard.outputs.version }}
+            type=raw,value=latest
+            type=sha,format=short
+
+      # The build context is the repo itself: core comes from npm, so nothing outside it is needed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Audit what was actually pushed, not a local rebuild of it. CI audits the same targets on every
+      # pull request; this is the copy that people will pull.
+      - name: Audit the pushed image
+        run: scripts/audit-image.sh ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ needs.guard.outputs.version }}
+
+  tag:
+    name: Tag and release v${{ needs.guard.outputs.version }}
+    needs: [guard, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      # The tag is cut only after the images are up, so a tag always corresponds to something
+      # published. Nothing here is a manual step that can be forgotten.
+      - name: Create the tag and the GitHub release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "mercury-release-bot[bot]"
+          git config user.email "mercury-release-bot[bot]@users.noreply.github.com"
+
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+          notes="$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v "\\]?" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md)"
+
+          printf '%s\n' "$notes" | gh release create "v$VERSION" \
+            --title "v$VERSION" --notes-file -

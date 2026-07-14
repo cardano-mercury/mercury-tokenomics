@@ -1,0 +1,15 @@
+# Code owners are requested for review automatically on every pull request, and branch protection
+# requires their approval. See CONTRIBUTING.md.
+
+# Everything, by default.
+*                       @Crypto2099
+
+# The things that are expensive to get wrong: the shared-database schema and its migrations, the
+# auth wiring (a session here is valid on the other Mercury apps), the deployment surface, and the
+# CI/release workflows that publish images.
+/src/lib/server/db/     @Crypto2099
+/drizzle/               @Crypto2099
+/src/lib/server/auth.ts @Crypto2099
+/Dockerfile             @Crypto2099
+/.github/               @Crypto2099
+/SECURITY.md            @Crypto2099

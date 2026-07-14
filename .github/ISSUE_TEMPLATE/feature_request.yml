@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a capability or a change
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a proof of concept with a deliberately bounded scope: on-chain data only, no oracle
+        integration, no complex UTxO accounting, and no assurance of correctness. See `docs/prd.md`.
+        Suggestions outside that are still welcome, but say so, and they will likely be future work.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you cannot do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
