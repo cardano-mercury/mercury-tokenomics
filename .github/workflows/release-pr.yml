@@ -1,0 +1,142 @@
+name: Release PR
+
+# Keeps a "Release vX.Y.Z" pull request open against main, holding everything on development that has
+# not shipped yet.
+#
+# This is what lets main stay strictly gated. Nothing pushes to main: the version bump and the
+# assembled changelog arrive as an ordinary pull request that runs the same CI as anything else, so no
+# bot ever needs permission to bypass branch protection.
+#
+# It runs after CI succeeds on development, so a release can only be raised from a green commit.
+#
+# The pull request is opened as the org's Mercury Release Bot rather than with GITHUB_TOKEN, and that
+# is load-bearing, not cosmetic. GitHub will not let a workflow run created with GITHUB_TOKEN trigger
+# further workflow runs, so a release pull request opened that way gets no checks at all: they sit at
+# `action_required` and cannot be approved (the approve endpoint answers 403, "This run is not from a
+# fork pull request"). main requires those checks, so the release could never merge, and it would
+# present as an absence of checks rather than as an error. An App installation token is a real actor,
+# so what it pushes runs CI normally.
+#
+# Setup: mercury-core/.claude/app-setup/README.md. The App is installed org-wide and both of its
+# values are org-level, so there is nothing to configure in this repo.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: false
+
+jobs:
+  open:
+    name: Open or update the release PR
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      # Skipped when the App is not configured, so the workflow still assembles the release. Its pull
+      # request just will not have working checks, and the body below says so rather than leaving the
+      # next person to work it out.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+          # The token the later `git push` inherits. Authenticating `gh` but leaving checkout on the
+          # default token means the branch is still pushed by GITHUB_TOKEN, and the pull request still
+          # gets no checks.
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Anything to release?
+        id: pending
+        run: |
+          set -euo pipefail
+          count="$(find .changes/unreleased -name '*.md' | wc -l)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "::notice::No pending change fragments. Nothing to release."
+          fi
+
+      # Assemble on a branch: compute the version from the fragments' bumps, write the CHANGELOG
+      # section, delete the fragments. The branch is rebuilt from development every time, so it
+      # reflects the current state rather than accumulating stale commits.
+      #
+      # scripts/release.mjs uses only Node built-ins, so there is no install step.
+      - name: Assemble the release
+        if: steps.pending.outputs.count != '0'
+        id: assemble
+        run: |
+          set -euo pipefail
+          git config user.name "mercury-release-bot[bot]"
+          git config user.email "mercury-release-bot[bot]@users.noreply.github.com"
+
+          node scripts/release.mjs
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          git checkout -B "release/v$version"
+          git add -A
+          git commit -m "Release v$version"
+          git push --force origin "release/v$version"
+
+      - name: Open or update the pull request
+        if: steps.pending.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.assemble.outputs.version }}
+          APP_CONFIGURED: ${{ steps.app-token.outputs.token != '' }}
+        run: |
+          set -euo pipefail
+
+          notes="$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v "\\]?" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md)"
+
+          warning=''
+          if [ "$APP_CONFIGURED" != "true" ]; then
+            warning='> **This pull request has no checks, and cannot get any.**
+          > It was opened with `GITHUB_TOKEN`, and GitHub does not let a workflow run created with that
+          > token trigger further workflow runs. The checks sit at `action_required` and cannot be
+          > approved. Configure the Mercury Release Bot (see `mercury-core/.claude/app-setup/README.md`)
+          > and re-run this workflow.
+
+          '
+          fi
+
+          body="$(printf '%sAssembled from the change fragments on \140development\140. The version is computed from the highest \140bump:\140 among them.\n\nMerging publishes **v%s**: CI runs on \140main\140, then the release workflow pushes the images to GHCR, tags \140v%s\140, and cuts the GitHub release.\n\nAfterwards a "Sync development" pull request appears, bringing the version bump and the consumed fragments back to \140development\140. Merge it, or the next release will try to ship these fragments again.\n\n%s\n' "$warning" "$VERSION" "$VERSION" "$notes")"
+
+          existing="$(gh pr list --base main --head "release/v$VERSION" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "Release v$VERSION" --body "$body"
+            echo "updated PR #$existing"
+          else
+            # Close any superseded release pull request, so only one is ever open.
+            for n in $(gh pr list --base main --json number,headRefName \
+                        --jq '.[] | select(.headRefName | startswith("release/v")) | .number'); do
+              gh pr close "$n" --comment "Superseded by Release v$VERSION." || true
+            done
+            gh pr create --base main --head "release/v$VERSION" \
+              --title "Release v$VERSION" --body "$body"
+            echo "opened the release pull request for v$VERSION"
+          fi

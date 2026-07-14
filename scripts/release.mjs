@@ -5,12 +5,13 @@
  * The version and the changelog are outputs of this step. Nothing else should write either, which is
  * why the pull request gate rejects a hand-edited version or changelog.
  *
- *   npm run release          # write it
- *   npm run release -- --dry # print what it would do, touch nothing
+ * **This is what the release bot runs** (`.github/workflows/release-pr.yml`), on a branch, whenever CI
+ * goes green on development. There is no reason to run it by hand. Merging the pull request it opens
+ * is what publishes and tags.
  *
- * Then commit the result, open it as a pull request (it runs the same CI as any other), and once it
- * is merged, tag the merge commit `v<version>`. The tag is what publishes the images, and the release
- * workflow refuses to publish if the tag and package.json disagree.
+ *   npm run release -- --dry   # see what the next release would contain, touch nothing
+ *
+ * It deliberately uses only Node built-ins, so the workflow needs no install step.
  */
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -83,5 +84,7 @@ writeFileSync('package.json', `${JSON.stringify(pkg, null, '\t')}\n`);
 
 for (const { file } of fragments) rmSync(join(DIR, file));
 
-console.log(`Released ${version} (${bump}) from ${fragments.length} fragment(s).`);
-console.log(`Commit, merge, then tag v${version}.`);
+console.log(`Assembled ${version} (${bump}) from ${fragments.length} fragment(s).`);
+console.log(
+	`This is what the release bot runs. Merging its pull request publishes and tags v${version}.`
+);

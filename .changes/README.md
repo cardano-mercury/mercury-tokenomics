@@ -45,15 +45,31 @@ changelog.
 
 ## Releasing
 
+**Nobody runs the release by hand.** When CI goes green on `development`, the Mercury Release Bot
+opens (or updates) a **Release vX.Y.Z** pull request against `main`, carrying the version bump, the
+assembled changelog, and the removal of the fragments it consumed. The version is the highest `bump`
+among them.
+
+It is an ordinary pull request and runs the same CI as anything else, so nothing bypasses the gate.
+The gate recognises a release and checks the opposite rules: the version must be exactly what the
+fragments imply, and the changelog must carry its section.
+
+Merging it is the act that publishes. CI runs on `main`, then the release workflow pushes both images
+to GHCR, tags `v<version>`, and cuts the GitHub release. No tag to remember, no manual publish.
+
+The pull request must be merged with a **merge commit**. The repository allows no other kind, on
+purpose: a squash would give `main` a commit sharing no ancestor with `development`, and every later
+release would then diff against the beginning of the repository.
+
+Afterwards the bot opens a **Sync development** pull request, bringing the release back to
+`development`. **Merge it.** Until it lands, `development` still holds the fragments that release
+already shipped, and the next release would assemble them a second time from a superseded
+`package.json`.
+
+To see what a release would contain before it is cut:
+
 ```sh
-npm run release          # compute the version, write the changelog, delete the fragments
-npm run release -- --dry # show what it would do, touch nothing
+npm run release -- --dry   # print the version and the changelog section, touch nothing
 ```
 
-The version is the highest `bump` among the fragments being consumed. Commit the result and open it as
-an ordinary pull request: it runs the same CI as anything else, and the gate recognises a release and
-checks the opposite rules (the version must be exactly what the fragments imply, and the changelog
-must carry its section).
-
-Once it is merged, tag the merge commit `v<version>`. The tag is what publishes the images, and the
-release workflow refuses to publish if the tag and `package.json` disagree.
+`npm run release` without `--dry` is what the bot runs. There is no reason to run it yourself.

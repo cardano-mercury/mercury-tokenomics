@@ -84,12 +84,23 @@ CI and not on your machine.
 `main` is what has been released. Nothing lands on it except a release.
 
 Work accumulates on `development`. Branch off it, open your pull request against it, and it merges
-once CI is green. When it is time to release, `npm run release` turns the accumulated fragments into a
-version and a changelog entry, and that goes to `main` as an ordinary pull request running the same
-CI. So no bot and no maintainer ever needs to push past the gate.
+once CI is green. That is the whole of what a contributor does.
+
+Releases are automatic and nobody runs them by hand. When CI goes green on `development`, the Mercury
+Release Bot opens a **Release vX.Y.Z** pull request against `main`, computing the version from the
+`bump:` fields of the accumulated fragments and assembling the changelog. It is an ordinary pull
+request running the same CI as any other, so **no bot ever needs permission to bypass the gate**.
+Merging it publishes: the images go to GHCR, the tag is cut, and the GitHub release is written. A
+**Sync development** pull request then appears, bringing the release back to `development`, and it
+needs merging too.
 
 Both branches are protected: no direct pushes, no force pushes, and the checks must pass. That applies
-to administrators too. If an administrator can push past CI, CI is a suggestion.
+to administrators too, and it is verified by attempting a push and being refused, not by reading the
+settings back. If an administrator can push past CI, CI is a suggestion.
+
+Merges are **merge commits**; squash and rebase are disabled on the repository. A squashed release
+would give `main` a commit sharing no ancestor with `development`, and every later release would diff
+against the beginning of the repository.
 
 Keep a pull request to one coherent change. If you are fixing a bug and tidying the surrounding code,
 those are two pull requests, or at least two commits with honest messages. A pull request that also

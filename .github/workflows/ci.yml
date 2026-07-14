@@ -7,15 +7,17 @@ name: CI
 # a check that only guards `main` lets a pull request land there with no fragment, and the release
 # assembled from that branch silently misses it.
 #
-# `workflow_call` lets the release workflow reuse this exact gate, so a tag cannot publish an image
-# that was never checked, and the checks are defined in one place rather than duplicated.
+# The release workflows hang off this one succeeding, not off a push, so nothing is ever published or
+# proposed from a commit whose gate is red:
+#
+#   CI green on development -> release-pr.yml opens "Release vX.Y.Z" against main
+#   CI green on main        -> release.yml publishes the images, tags, and cuts the GitHub release
 
 on:
   pull_request:
     branches: [main, development]
   push:
     branches: [main, development]
-  workflow_call:
 
 # A newer commit on a branch supersedes in-flight runs for that branch or PR.
 concurrency:

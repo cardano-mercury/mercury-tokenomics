@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-14
+
+### Added
+
+- Automated releases through the organisation's Mercury Release Bot. CI going green on `development`
+  opens a `Release vX.Y.Z` pull request against `main`, assembled from the accumulated change fragments;
+  merging it publishes the images to GHCR, tags the version, and cuts the GitHub release. A
+  `Sync development` pull request follows, bringing the release back to `development` so the next one
+  does not ship the same fragments twice.
+
+  The bot authenticates as a GitHub App rather than with `GITHUB_TOKEN`. That is load-bearing: GitHub
+  does not let a workflow run created with `GITHUB_TOKEN` trigger further workflow runs, so a release
+  pull request opened that way would get no checks at all, and `main` requires them, so it could never
+  merge. Publishing is now triggered by CI succeeding on `main` rather than by a hand-pushed tag, and it
+  refuses to publish a version that is already tagged.
+
+### Fixed
+
+- The generated `coverage/` report is no longer committed to the repository. Twenty-nine files of it had
+  been added by a `git add -A` when coverage was first enabled, and ESLint was linting them.
+
 ## [0.16.1] - 2026-07-14
 
 ### Fixed

@@ -76,7 +76,9 @@ Two images, because the runner installs production dependencies only: it carries
 docker compose run --rm --entrypoint sh tokenomics-migrate -c 'node scripts/seed.mjs'
 ```
 
-A push to `main` publishes a rolling `main` tag; a `v*` tag publishes the semver plus `latest`. Both also get `sha-<short>` so a deploy can be pinned to a commit. **GHCR packages are private by default and both must be made public once**, or every pull needs a token; the setting is on the package, not the repo.
+Releases are automated end to end and nobody tags by hand. CI going green on `development` makes the Mercury Release Bot open a `Release vX.Y.Z` pull request against `main`, assembled from the accumulated change fragments. Merging it publishes: the images go to GHCR tagged with the version, `latest`, and `sha-<short>` (so a deploy can be pinned to a commit), the tag is cut, and the GitHub release is written. A `Sync development` pull request follows and must be merged too. See `CONTRIBUTING.md`.
+
+**GHCR packages are private by default and both must be made public once**, or every pull needs a token. The setting is on the package, not the repo, and making a package public is irreversible.
 
 ## Contributing
 
