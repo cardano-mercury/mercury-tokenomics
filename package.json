@@ -7,7 +7,7 @@
 		"type": "git",
 		"url": "git+https://github.com/cardano-mercury/mercury-tokenomics.git"
 	},
-	"version": "0.17.0",
+	"version": "0.17.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
