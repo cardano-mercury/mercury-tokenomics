@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-07-15
+
+### Changed
+
+- A pull request may now satisfy the change gate by revising a change fragment that has not been released
+  yet, not only by adding a new one. Correcting the wording or the bump of a pending entry is a
+  legitimate change, and previously the gate rejected a pull request that did only that.
+
+### Fixed
+
+- The Dependabot config was invalid and therefore doing nothing. `semver-major-days` and
+  `semver-minor-days` are not supported for the `github-actions` and `docker` ecosystems, and Dependabot
+  rejects a bad config **whole**, so the npm cooldowns were silently inactive too. Those ecosystems now
+  carry only `default-days`, which is all they support.
+- Merging a release no longer fires the publish workflow twice. `workflow_run`'s `branches:` filter
+  matches the CI run's **head** branch, not its base, so the CI run for the Sync development pull request
+  (whose head is `main`) matched as well as the push to `main` itself. Two publish runs raced for the
+  same version and one failed on the tag. Both release workflows now require the triggering CI run to
+  have come from a `push`, and the publish workflow takes a concurrency lock.
+
+### Security
+
+- Pinned five vulnerable transitive dependencies with npm `overrides`, taking `npm audit` from
+  twenty-one advisories, one of them high, to zero. The high was `undici@5.29.0`, reached through
+  `@meshsdk/core`.
+
+  There is no upgrade path out of it: `@meshsdk/core` and `drizzle-kit` are both already on their latest
+  release, and `npm audit fix` offers to downgrade them instead. The pinned packages are `undici`,
+  `ip-address` and `esbuild`, plus `cookie` (reached through SvelteKit) and `uuid` (through exceljs).
+
+  Each override was exercised against the code that depends on it: address parsing under `undici` 6
+  returns identical results, the auth session still round-trips under `cookie` 0.7, the xlsx export still
+  produces a valid workbook under `uuid` 11, and `drizzle-kit` still reads the schema under `esbuild`
+  0.25.
+
 ## [0.17.0] - 2026-07-14
 
 ### Added
