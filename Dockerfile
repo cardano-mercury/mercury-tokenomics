@@ -5,7 +5,7 @@
 # An ordinary single-context build: @cardano-mercury/core comes from npm, so this repo is the whole
 # context and no sibling checkout is needed.
 
-FROM node:22-alpine AS base
+FROM node:25-alpine AS base
 WORKDIR /app
 
 
