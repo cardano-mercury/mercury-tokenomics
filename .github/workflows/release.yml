@@ -31,14 +31,28 @@ on:
 permissions:
   contents: read
 
+# Publishing a given commit twice is never right, and the tag job races itself if it happens.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   guard:
     name: Is this version unreleased?
     runs-on: ubuntu-latest
-    # A failed or cancelled CI run must not publish. workflow_dispatch has no run to inspect.
+    # Three conditions, and the middle one is not obvious.
+    #
+    # A failed or cancelled CI run must not publish.
+    #
+    # `branches: [main]` matches the CI run's HEAD branch, not its base, so the CI run for a pull
+    # request whose head IS main also matches. The Sync development pull request (main -> development)
+    # is exactly that, so merging a release fired this workflow twice: once for the push to main and
+    # once for the sync pull request's CI. Both raced to publish and tag the same version, and one of
+    # them failed. Only the push to main is a release.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     outputs:
       version: ${{ steps.check.outputs.version }}
       publish: ${{ steps.check.outputs.publish }}
